@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APKs
 
 on:
   push:
@@ -8,35 +8,68 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-customer:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
-
-      - name: Get dependencies
+      - name: Build Customer App
         working-directory: apps/customer_app
-        run: flutter pub get
-
-      - name: Build APK
-        working-directory: apps/customer_app
-        run: flutter build apk --release
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+        run: |
+          flutter pub get
+          flutter build apk --release
+      - uses: actions/upload-artifact@v4
         with:
           name: dz-delivery-customer-apk
           path: apps/customer_app/build/app/outputs/flutter-apk/app-release.apk
+
+  build-livreur:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+      - name: Build Livreur App
+        working-directory: apps/livreur_app
+        run: |
+          flutter pub get
+          flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dz-delivery-livreur-apk
+          path: apps/livreur_app/build/app/outputs/flutter-apk/app-release.apk
+
+  build-restaurant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+      - name: Build Restaurant App
+        working-directory: apps/restaurant_app
+        run: |
+          flutter pub get
+          flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dz-delivery-restaurant-apk
+          path: apps/restaurant_app/build/app/outputs/flutter-apk/app-release.apk
