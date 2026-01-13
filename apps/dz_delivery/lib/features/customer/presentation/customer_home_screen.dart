@@ -468,6 +468,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Widget _buildTopRestaurantCard(Map<String, dynamic> restaurant) {
+    // La fonction SQL retourne avg_prep_time, pas avg_delivery_time
+    final prepTime = restaurant['avg_delivery_time'] ?? restaurant['avg_prep_time'] ?? 30;
+    
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, AppRouter.restaurantDetail, arguments: restaurant['id']),
       child: Container(
@@ -548,7 +551,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     children: [
                       Icon(Icons.access_time, size: 12, color: Colors.grey[500]),
                       Text(
-                        ' ${restaurant['avg_delivery_time'] ?? 30} min',
+                        ' $prepTime min',
                         style: TextStyle(color: Colors.grey[500], fontSize: 11),
                       ),
                     ],
@@ -563,6 +566,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Widget _buildRestaurantTile(Map<String, dynamic> restaurant) {
+    // La fonction SQL retourne distance_km, pas distance
+    final distance = restaurant['distance'] ?? restaurant['distance_km'];
+    
     return ListTile(
       onTap: () => Navigator.pushNamed(context, AppRouter.restaurantDetail, arguments: restaurant['id']),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -586,7 +592,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text('${restaurant['distance']?.toStringAsFixed(1) ?? '?'} km', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text('${distance?.toStringAsFixed(1) ?? '?'} km', style: const TextStyle(fontWeight: FontWeight.bold)),
           Text('${restaurant['avg_prep_time'] ?? 30} min', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
         ],
       ),

@@ -45,17 +45,15 @@ class _RestaurantHomeScreenState extends State<RestaurantHomeScreen> {
         return;
       }
       
-      final results = await Future.wait([
-        SupabaseService.getRestaurantPendingOrders(),
-        SupabaseService.getRestaurantStats(),
-      ]);
+      final pendingOrders = await SupabaseService.getRestaurantPendingOrders();
+      final stats = await SupabaseService.getRestaurantStats();
       
       if (mounted) {
         setState(() {
           _restaurant = restaurant;
           _isOpen = restaurant['is_open'] ?? true;
-          _pendingOrders = results[0];
-          _stats = results[1];
+          _pendingOrders = pendingOrders;
+          _stats = stats;
         });
         
         if (_ordersChannel == null) {

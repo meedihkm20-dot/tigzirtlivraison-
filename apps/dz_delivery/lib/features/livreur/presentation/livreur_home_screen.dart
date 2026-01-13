@@ -71,14 +71,12 @@ class _LivreurHomeScreenState extends State<LivreurHomeScreen> {
     if (!_isOnline) return;
     setState(() => _isLoading = true);
     try {
-      final results = await Future.wait([
-        SupabaseService.getAvailableOrders(),
-        SupabaseService.getLivreurActiveOrders(),
-      ]);
+      final availableOrders = await SupabaseService.getAvailableOrders();
+      final activeOrders = await SupabaseService.getLivreurActiveOrders();
       if (mounted) {
         setState(() {
-          _availableOrders = results[0];
-          _activeOrders = results[1];
+          _availableOrders = availableOrders;
+          _activeOrders = activeOrders;
         });
       }
     } catch (e) {
