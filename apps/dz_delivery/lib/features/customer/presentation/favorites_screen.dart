@@ -25,21 +25,34 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     setState(() => _isLoading = true);
     try {
       final favorites = await SupabaseService.getFavoriteRestaurants();
-      setState(() {
-        _favorites = favorites;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _favorites = favorites;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      debugPrint('Erreur chargement favoris: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _removeFavorite(String restaurantId) async {
-    await SupabaseService.toggleFavoriteRestaurant(restaurantId);
-    _loadFavorites();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Retiré des favoris'), duration: Duration(seconds: 1)),
-    );
+    try {
+      await SupabaseService.toggleFavoriteRestaurant(restaurantId);
+      _loadFavorites();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Retiré des favoris'), duration: Duration(seconds: 1)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   @override

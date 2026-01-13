@@ -26,25 +26,44 @@ class _LivreurHomeScreenState extends State<LivreurHomeScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final profile = await SupabaseService.getLivreurProfile();
-    final tierInfo = await SupabaseService.getLivreurTierInfo();
-    if (profile != null) {
-      setState(() {
-        _livreurProfile = profile;
-        _tierInfo = tierInfo;
-        _isOnline = profile['is_online'] ?? false;
-      });
-      if (_isOnline) _loadOrders();
+    try {
+      final profile = await SupabaseService.getLivreurProfile();
+      Map<String, dynamic>? tierInfo;
+      try {
+        tierInfo = await SupabaseService.getLivreurTierInfo();
+      } catch (e) {
+        debugPrint('Erreur tier info: $e');
+      }
+      
+      if (profile != null && mounted) {
+        setState(() {
+          _livreurProfile = profile;
+          _tierInfo = tierInfo;
+          _isOnline = profile['is_online'] ?? false;
+        });
+        if (_isOnline) _loadOrders();
+      }
+    } catch (e) {
+      debugPrint('Erreur profil livreur: $e');
     }
   }
 
   Future<void> _toggleOnline(bool value) async {
     setState(() => _isOnline = value);
-    await SupabaseService.setOnlineStatus(value);
-    if (value) {
-      _loadOrders();
-    } else {
-      setState(() => _availableOrders = []);
+    try {
+      await SupabaseService.setOnlineStatus(value);
+      if (value) {
+        _loadOrders();
+      } else {
+        setState(() => _availableOrders = []);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+        setState(() => _isOnline = !value);
+      }
     }
   }
 
@@ -52,27 +71,39 @@ class _LivreurHomeScreenState extends State<LivreurHomeScreen> {
     if (!_isOnline) return;
     setState(() => _isLoading = true);
     try {
-      final available = await SupabaseService.getAvailableOrders();
-      final active = await SupabaseService.getLivreurActiveOrders();
-      setState(() {
-        _availableOrders = available;
-        _activeOrders = active;
-      });
+      final results = await Future.wait([
+        SupabaseService.getAvailableOrders(),
+        SupabaseService.getLivreurActiveOrders(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _availableOrders = results[0];
+          _activeOrders = results[1];
+        });
+      }
     } catch (e) {
-      debugPrint('Erreur: $e');
+      debugPrint('Erreur chargement commandes: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _acceptOrder(String orderId) async {
     try {
       await SupabaseService.acceptOrder(orderId);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Commande acceptée!'), backgroundColor: Colors.green));
-      Navigator.pushNamed(context, AppRouter.delivery, arguments: orderId);
-      _loadOrders();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Commande acceptée! 🎉'), backgroundColor: Colors.green),
+        );
+        Navigator.pushNamed(context, AppRouter.delivery, arguments: orderId);
+        _loadOrders();
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: ${e.toString().replaceAll('Exception:', '')}'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 

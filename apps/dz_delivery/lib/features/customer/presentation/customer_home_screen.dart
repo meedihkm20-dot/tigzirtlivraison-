@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/services/location_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -35,17 +36,18 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     setState(() => _isLoading = true);
     
     try {
-      // Charger en parallèle
+      // Charger en parallèle avec gestion d'erreur individuelle
       final results = await Future.wait([
-        SupabaseService.getTopRestaurants(limit: 5),
-        SupabaseService.getDailySpecials(),
-        SupabaseService.getTopMenuItems(limit: 10),
-        SupabaseService.getProfile(),
-        SupabaseService.getCustomerLoyalty(),
-        SupabaseService.getRecentSearches(limit: 5),
+        _safeCall(() => SupabaseService.getTopRestaurants(limit: 5), <Map<String, dynamic>>[]),
+        _safeCall(() => SupabaseService.getDailySpecials(), <Map<String, dynamic>>[]),
+        _safeCall(() => SupabaseService.getTopMenuItems(limit: 10), <Map<String, dynamic>>[]),
+        _safeCall(() => SupabaseService.getProfile(), null),
+        _safeCall(() => SupabaseService.getCustomerLoyalty(), {'points': 0, 'total_orders': 0}),
+        _safeCall(() => SupabaseService.getRecentSearches(limit: 5), <String>[]),
         _loadNearbyRestaurants(),
       ]);
       
+      if (!mounted) return;
       setState(() {
         _topRestaurants = results[0] as List<Map<String, dynamic>>;
         _dailySpecials = results[1] as List<Map<String, dynamic>>;
@@ -56,9 +58,30 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         _nearbyRestaurants = results[6] as List<Map<String, dynamic>>;
         _isLoading = false;
       });
+      
+      // Charger le nombre de notifications non lues
+      _loadUnreadNotifications();
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
       debugPrint('Erreur chargement: $e');
+    }
+  }
+  
+  Future<T> _safeCall<T>(Future<T> Function() call, T defaultValue) async {
+    try {
+      return await call();
+    } catch (e) {
+      debugPrint('Erreur appel: $e');
+      return defaultValue;
+    }
+  }
+  
+  Future<void> _loadUnreadNotifications() async {
+    try {
+      final count = await NotificationService.getUnreadCount();
+      if (mounted) setState(() => _unreadNotifications = count);
+    } catch (e) {
+      debugPrint('Erreur notifications: $e');
     }
   }
 
@@ -202,7 +225,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                                     children: [
                                       IconButton(
                                         icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-                                        onPressed: () => Navigator.pushNamed(context, '/customer/notifications'),
+                                        onPressed: () => Navigator.pushNamed(context, AppRouter.notifications),
                                       ),
                                       if (_unreadNotifications > 0)
                                         Positioned(
@@ -656,7 +679,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               _buildNavItem(Icons.search, 'Explorer', false, () {}),
               _buildNavItem(Icons.shopping_bag_outlined, 'Commandes', false, 
                   () => Navigator.pushNamed(context, AppRouter.customerOrders)),
-              _buildNavItem(Icons.favorite_border, 'Favoris', false, () {}),
+              _buildNavItem(Icons.favorite_border, 'Favoris', false, 
+                  () => Navigator.pushNamed(context, AppRouter.favorites)),
               _buildNavItem(Icons.person_outline, 'Profil', false, 
                   () => Navigator.pushNamed(context, AppRouter.customerProfile)),
             ],

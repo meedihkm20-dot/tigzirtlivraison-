@@ -25,23 +25,48 @@ class _TierProgressScreenState extends State<TierProgressScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final results = await Future.wait([
-        SupabaseService.getLivreurTierInfo(),
-        SupabaseService.getNextTierRequirements(),
-        SupabaseService.getLivreurBonusHistory(limit: 20),
-        SupabaseService.getDailyTargets(),
-      ]);
+      // Charger avec gestion d'erreur individuelle
+      Map<String, dynamic>? tierInfo;
+      Map<String, dynamic>? nextTierReq;
+      List<Map<String, dynamic>> bonusHistory = [];
+      List<Map<String, dynamic>> targets = [];
       
-      setState(() {
-        _tierInfo = results[0] as Map<String, dynamic>?;
-        _nextTierReq = results[1] as Map<String, dynamic>?;
-        _bonusHistory = results[2] as List<Map<String, dynamic>>;
-        _targets = results[3] as List<Map<String, dynamic>>;
-        _isLoading = false;
-      });
+      try {
+        tierInfo = await SupabaseService.getLivreurTierInfo();
+      } catch (e) {
+        debugPrint('Erreur tier info: $e');
+      }
+      
+      try {
+        nextTierReq = await SupabaseService.getNextTierRequirements();
+      } catch (e) {
+        debugPrint('Erreur next tier: $e');
+      }
+      
+      try {
+        bonusHistory = await SupabaseService.getLivreurBonusHistory(limit: 20);
+      } catch (e) {
+        debugPrint('Erreur bonus history: $e');
+      }
+      
+      try {
+        targets = await SupabaseService.getDailyTargets();
+      } catch (e) {
+        debugPrint('Erreur targets: $e');
+      }
+      
+      if (mounted) {
+        setState(() {
+          _tierInfo = tierInfo;
+          _nextTierReq = nextTierReq;
+          _bonusHistory = bonusHistory;
+          _targets = targets;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
-      debugPrint('Erreur: $e');
+      if (mounted) setState(() => _isLoading = false);
+      debugPrint('Erreur générale: $e');
     }
   }
 

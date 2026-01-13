@@ -40,12 +40,15 @@ class _KitchenScreenState extends State<KitchenScreen> {
       }
       _previousOrderCount = orders.length;
       
-      setState(() {
-        _orders = orders;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _orders = orders;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      debugPrint('Erreur chargement cuisine: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -65,16 +68,34 @@ class _KitchenScreenState extends State<KitchenScreen> {
   }
 
   Future<void> _startPreparing(String orderId) async {
-    await SupabaseService.startPreparing(orderId);
-    _loadOrders();
+    try {
+      await SupabaseService.startPreparing(orderId);
+      _loadOrders();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _markAsReady(String orderId) async {
-    await SupabaseService.markAsReady(orderId);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Commande prête! Le livreur est notifié'), backgroundColor: Colors.green),
-    );
-    _loadOrders();
+    try {
+      await SupabaseService.markAsReady(orderId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Commande prête! 🍽️ Le livreur est notifié'), backgroundColor: Colors.green),
+        );
+      }
+      _loadOrders();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Color _getOrderColor(Map<String, dynamic> order) {

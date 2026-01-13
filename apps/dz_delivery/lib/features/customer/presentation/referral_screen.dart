@@ -27,18 +27,38 @@ class _ReferralScreenState extends State<ReferralScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final code = await SupabaseService.getReferralCode();
-      final stats = await SupabaseService.getReferralStats();
-      final referrals = await SupabaseService.getMyReferrals();
+      String? code;
+      Map<String, dynamic> stats = {'total_referrals': 0, 'total_earnings': 0};
+      List<Map<String, dynamic>> referrals = [];
       
-      setState(() {
-        _referralCode = code;
-        _stats = stats;
-        _referrals = referrals;
-        _isLoading = false;
-      });
+      try {
+        code = await SupabaseService.getReferralCode();
+      } catch (e) {
+        debugPrint('Erreur code parrainage: $e');
+      }
+      
+      try {
+        stats = await SupabaseService.getReferralStats();
+      } catch (e) {
+        debugPrint('Erreur stats parrainage: $e');
+      }
+      
+      try {
+        referrals = await SupabaseService.getMyReferrals();
+      } catch (e) {
+        debugPrint('Erreur liste parrainages: $e');
+      }
+      
+      if (mounted) {
+        setState(() {
+          _referralCode = code;
+          _stats = stats;
+          _referrals = referrals;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -74,32 +94,51 @@ Télécharge l'app et commande tes plats préférés!
   }
 
   Future<void> _applyCode() async {
-    final code = _codeController.text.trim();
+    final code = _codeController.text.trim().toUpperCase();
     if (code.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Entrez un code'), backgroundColor: Colors.red),
+        const SnackBar(content: Text('Entrez un code'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    
+    if (code.length < 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Code trop court'), backgroundColor: Colors.orange),
       );
       return;
     }
 
-    final result = await SupabaseService.applyReferralCode(code);
-    
-    if (result['success'] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message'] ?? 'Code appliqué!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      _codeController.clear();
-      _loadData();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message'] ?? 'Erreur'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    try {
+      final result = await SupabaseService.applyReferralCode(code);
+      
+      if (result['success'] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Code appliqué! 🎉'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        _codeController.clear();
+        _loadData();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Code invalide'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 

@@ -231,6 +231,13 @@ class _MenuScreenState extends State<MenuScreen> with SingleTickerProviderStateM
                         return;
                       }
                       
+                      // Upload image si présente
+                      String? imageUrl;
+                      if (imageBytes != null) {
+                        final itemId = DateTime.now().millisecondsSinceEpoch.toString();
+                        imageUrl = await SupabaseService.uploadMenuItemImage(itemId, imageBytes!);
+                      }
+                      
                       // Ajouter le plat
                       await SupabaseService.addMenuItem(
                         name: nameController.text,
@@ -238,9 +245,8 @@ class _MenuScreenState extends State<MenuScreen> with SingleTickerProviderStateM
                         description: descController.text.isEmpty ? null : descController.text,
                         categoryId: selectedCategoryId,
                         prepTime: int.tryParse(prepTimeController.text) ?? 15,
+                        imageUrl: imageUrl,
                       );
-                      
-                      // TODO: Upload image si présente
                       
                       Navigator.pop(context);
                       _loadMenu();

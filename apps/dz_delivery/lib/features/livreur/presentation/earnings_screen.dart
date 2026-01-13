@@ -22,12 +22,20 @@ class _EarningsScreenState extends State<EarningsScreen> {
   Future<void> _loadEarnings() async {
     try {
       final earnings = await SupabaseService.getLivreurEarnings();
-      setState(() {
-        _earnings = earnings;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _earnings = earnings;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      debugPrint('Erreur chargement gains: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 

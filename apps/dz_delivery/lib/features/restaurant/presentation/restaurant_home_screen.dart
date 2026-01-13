@@ -36,34 +36,63 @@ class _RestaurantHomeScreenState extends State<RestaurantHomeScreen> {
     setState(() => _isLoading = true);
     try {
       final restaurant = await SupabaseService.getMyRestaurant();
-      final orders = await SupabaseService.getRestaurantPendingOrders();
-      final stats = await SupabaseService.getRestaurantStats();
-      
-      setState(() {
-        _restaurant = restaurant;
-        _isOpen = restaurant?['is_open'] ?? true;
-        _pendingOrders = orders;
-        _stats = stats;
-      });
-      
-      if (restaurant != null && _ordersChannel == null) {
-        _ordersChannel = SupabaseService.subscribeToNewRestaurantOrders(restaurant['id'], (order) {
-          _loadData();
+      if (restaurant == null) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('🔔 Nouvelle commande!'), backgroundColor: Colors.green),
+            const SnackBar(content: Text('Restaurant non trouvé'), backgroundColor: Colors.red),
           );
+        }
+        return;
+      }
+      
+      final results = await Future.wait([
+        SupabaseService.getRestaurantPendingOrders(),
+        SupabaseService.getRestaurantStats(),
+      ]);
+      
+      if (mounted) {
+        setState(() {
+          _restaurant = restaurant;
+          _isOpen = restaurant['is_open'] ?? true;
+          _pendingOrders = results[0];
+          _stats = results[1];
         });
+        
+        if (_ordersChannel == null) {
+          _ordersChannel = SupabaseService.subscribeToNewRestaurantOrders(restaurant['id'], (order) {
+            _loadData();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('🔔 Nouvelle commande!'), backgroundColor: Colors.green),
+              );
+            }
+          });
+        }
       }
     } catch (e) {
       debugPrint('Erreur: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur de chargement: $e'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _toggleOpen(bool value) async {
     setState(() => _isOpen = value);
-    await SupabaseService.setRestaurantOpen(value);
+    try {
+      await SupabaseService.setRestaurantOpen(value);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isOpen = !value);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   void _onNavTap(int index) {
@@ -273,25 +302,70 @@ class _RestaurantHomeScreenState extends State<RestaurantHomeScreen> {
   }
 
   Future<void> _confirmOrder(String orderId) async {
-    await SupabaseService.confirmOrder(orderId, 30);
-    _loadData();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Commande confirmée'), backgroundColor: Colors.green));
+    try {
+      await SupabaseService.confirmOrder(orderId, 30);
+      _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Commande confirmée ✅'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _startPreparing(String orderId) async {
-    await SupabaseService.startPreparing(orderId);
-    _loadData();
+    try {
+      await SupabaseService.startPreparing(orderId);
+      _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _markAsReady(String orderId) async {
-    await SupabaseService.markAsReady(orderId);
-    _loadData();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Commande prête!'), backgroundColor: Colors.green));
+    try {
+      await SupabaseService.markAsReady(orderId);
+      _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Commande prête! 🍽️'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _cancelOrder(String orderId) async {
-    await SupabaseService.cancelOrder(orderId, 'Refusé par le restaurant');
-    _loadData();
+    try {
+      await SupabaseService.cancelOrder(orderId, 'Refusé par le restaurant');
+      _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Commande refusée'), backgroundColor: Colors.orange),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Map<String, dynamic> _getStatusInfo(String? status) {

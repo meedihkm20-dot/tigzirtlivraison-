@@ -162,9 +162,38 @@ class SupabaseService {
   }
 
   static Future<Map<String, dynamic>?> getRestaurant(String id) async {
-    return await client.from('restaurants')
-        .select('*, menu_categories(*, menu_items(*))')
+    // Récupérer le restaurant avec catégories ET tous les plats
+    final restaurant = await client.from('restaurants')
+        .select('*, menu_categories(*)')
         .eq('id', id).single();
+    
+    // Récupérer tous les plats du restaurant (avec ou sans catégorie)
+    final allItems = await client.from('menu_items')
+        .select()
+        .eq('restaurant_id', id)
+        .eq('is_available', true)
+        .order('name');
+    
+    // Organiser les plats par catégorie
+    final categories = List<Map<String, dynamic>>.from(restaurant['menu_categories'] ?? []);
+    
+    // Ajouter les plats à leurs catégories respectives
+    for (var category in categories) {
+      category['menu_items'] = allItems.where((item) => item['category_id'] == category['id']).toList();
+    }
+    
+    // Ajouter une catégorie "Autres" pour les plats sans catégorie
+    final uncategorizedItems = allItems.where((item) => item['category_id'] == null).toList();
+    if (uncategorizedItems.isNotEmpty) {
+      categories.add({
+        'id': 'uncategorized',
+        'name': 'Menu',
+        'menu_items': uncategorizedItems,
+      });
+    }
+    
+    restaurant['menu_categories'] = categories;
+    return restaurant;
   }
 
   static Future<List<Map<String, dynamic>>> searchRestaurants(String query) async {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -74,13 +75,38 @@ class _ReorderScreenState extends State<ReorderScreen> {
     );
 
     if (confirm == true) {
-      // Aller au restaurant avec les items pré-sélectionnés
-      Navigator.pushNamed(
-        context,
-        AppRouter.restaurantDetail,
-        arguments: order['restaurant_id'],
-      );
-      // TODO: Pré-remplir le panier avec les items
+      // Pré-remplir le panier avec les items de la commande
+      final items = order['order_items'] as List? ?? [];
+      final restaurantId = order['restaurant_id'] as String?;
+      final restaurantName = order['restaurant']?['name'] as String?;
+      
+      if (restaurantId != null && items.isNotEmpty) {
+        final cartBox = Hive.box('cart');
+        
+        // Vider le panier actuel
+        await cartBox.delete('items');
+        await cartBox.delete('restaurant_id');
+        
+        // Ajouter les items de la commande précédente
+        final cartItems = items.map((item) => {
+          'id': item['menu_item_id'],
+          'name': item['name'],
+          'price': item['price'],
+          'quantity': item['quantity'] ?? 1,
+          'restaurant_id': restaurantId,
+          'restaurant_name': restaurantName,
+        }).toList();
+        
+        await cartBox.put('items', cartItems);
+        await cartBox.put('restaurant_id', restaurantId);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Panier pré-rempli! 🛒'), backgroundColor: Colors.green),
+          );
+          Navigator.pushNamed(context, AppRouter.cart);
+        }
+      }
     }
   }
 

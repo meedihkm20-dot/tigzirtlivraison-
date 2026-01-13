@@ -61,14 +61,37 @@ class _CartScreenState extends State<CartScreen> {
     });
   }
 
-  double get _subtotal => _items.fold(0, (sum, item) => sum + (item['price'] ?? 0) * (item['quantity'] ?? 1));
+  double get _subtotal => _items.fold(0.0, (sum, item) => sum + ((item['price'] as num?)?.toDouble() ?? 0) * ((item['quantity'] as num?)?.toInt() ?? 1));
   double get _deliveryFee => 150;
   double get _total => _subtotal + _deliveryFee;
 
   Future<void> _placeOrder() async {
-    if (_items.isEmpty || _restaurantId == null) return;
-    if (_addressController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Entrez votre adresse de livraison')));
+    // Validation complète
+    if (_items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Votre panier est vide'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    
+    if (_restaurantId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erreur: restaurant non identifié'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    
+    if (_addressController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Entrez votre adresse de livraison'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    
+    if (_addressController.text.trim().length < 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Adresse trop courte, soyez plus précis'), backgroundColor: Colors.orange),
+      );
       return;
     }
 
@@ -78,7 +101,7 @@ class _CartScreenState extends State<CartScreen> {
       final order = await SupabaseService.createOrder(
         restaurantId: _restaurantId!,
         items: _items,
-        deliveryAddress: _addressController.text,
+        deliveryAddress: _addressController.text.trim(),
         deliveryLat: 36.8869,
         deliveryLng: 4.1260,
         subtotal: _subtotal,
@@ -88,10 +111,17 @@ class _CartScreenState extends State<CartScreen> {
 
       _clearCart();
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Commande passée avec succès! 🎉'), backgroundColor: Colors.green),
+        );
         Navigator.pushReplacementNamed(context, AppRouter.orderTracking, arguments: order['id']);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: ${e.toString().replaceAll('Exception:', '')}'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

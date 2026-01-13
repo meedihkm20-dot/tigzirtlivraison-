@@ -32,19 +32,31 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   Future<void> _loadOrder() async {
     try {
       final order = await SupabaseService.getOrder(widget.orderId);
-      setState(() {
-        _order = order;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _order = order;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      debugPrint('Erreur chargement commande: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
   void _subscribeToUpdates() {
-    _channel = SupabaseService.subscribeToOrder(widget.orderId, (update) {
-      _loadOrder();
-    });
+    try {
+      _channel = SupabaseService.subscribeToOrder(widget.orderId, (update) {
+        _loadOrder();
+      });
+    } catch (e) {
+      debugPrint('Erreur subscription: $e');
+    }
   }
 
   @override

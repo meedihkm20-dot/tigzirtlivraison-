@@ -37,33 +37,50 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   }
 
   Future<void> _initLocation() async {
-    final hasPermission = await LocationService.checkPermission();
-    if (hasPermission) {
-      final position = await LocationService.getCurrentLocation();
-      if (position != null && mounted) {
-        setState(() => _currentPosition = position);
+    try {
+      final hasPermission = await LocationService.checkPermission();
+      if (hasPermission) {
+        final position = await LocationService.getCurrentLocation();
+        if (position != null && mounted) {
+          setState(() => _currentPosition = position);
+        }
+        _startLocationTracking();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Permission de localisation requise'), backgroundColor: Colors.orange),
+          );
+        }
       }
-      _startLocationTracking();
+    } catch (e) {
+      debugPrint('Erreur localisation: $e');
     }
   }
 
   void _startLocationTracking() {
-    LocationService.getLocationStream().listen((locationData) {
-      if (locationData.latitude != null && locationData.longitude != null && mounted) {
-        final newPosition = LatLng(locationData.latitude!, locationData.longitude!);
-        setState(() => _currentPosition = newPosition);
-        
-        if (_tracker != null && _isNavigating) {
-          _tracker!.updatePosition(newPosition);
-          VoiceNavigationService.checkAndAnnounce(
-            currentPosition: newPosition,
-            route: _route!,
-            currentStepIndex: _currentStepIndex,
-          );
-        }
-        _updateLivreurPosition(newPosition);
-      }
-    });
+    try {
+      LocationService.getLocationStream().listen(
+        (locationData) {
+          if (locationData.latitude != null && locationData.longitude != null && mounted) {
+            final newPosition = LatLng(locationData.latitude!, locationData.longitude!);
+            setState(() => _currentPosition = newPosition);
+            
+            if (_tracker != null && _isNavigating && _route != null) {
+              _tracker!.updatePosition(newPosition);
+              VoiceNavigationService.checkAndAnnounce(
+                currentPosition: newPosition,
+                route: _route!,
+                currentStepIndex: _currentStepIndex,
+              );
+            }
+            _updateLivreurPosition(newPosition);
+          }
+        },
+        onError: (e) => debugPrint('Erreur stream localisation: $e'),
+      );
+    } catch (e) {
+      debugPrint('Erreur démarrage tracking: $e');
+    }
   }
 
   Future<void> _updateLivreurPosition(LatLng position) async {
@@ -75,53 +92,65 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   Future<void> _loadOrder() async {
     try {
       final order = await SupabaseService.getOrder(widget.orderId);
-      setState(() {
-        _order = order;
-        _isLoading = false;
-      });
-      _calculateRoute();
+      if (mounted) {
+        setState(() {
+          _order = order;
+          _isLoading = false;
+        });
+        _calculateRoute();
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      debugPrint('Erreur chargement commande: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
   Future<void> _calculateRoute() async {
     if (_currentPosition == null || _order == null) return;
 
-    final status = _order!['status'] as String?;
-    LatLng destination;
-    
-    if (status == 'delivering' || status == 'picked_up') {
-      destination = LatLng(
-        (_order!['delivery_latitude'] as num?)?.toDouble() ?? 36.7538,
-        (_order!['delivery_longitude'] as num?)?.toDouble() ?? 3.0588,
-      );
-    } else {
-      destination = LatLng(
-        (_order!['restaurant']?['latitude'] as num?)?.toDouble() ?? 36.7538,
-        (_order!['restaurant']?['longitude'] as num?)?.toDouble() ?? 3.0588,
-      );
-    }
-
-    final route = await RoutingService.getRoute(_currentPosition!, destination);
-    if (route != null && mounted) {
-      setState(() {
-        _route = route;
-        _tracker = NavigationTracker(
-          route: route,
-          destination: destination,
-          onRerouteNeeded: () {
-            VoiceNavigationService.announceRerouting();
-            _calculateRoute();
-          },
-          onStepChanged: (i) => setState(() => _currentStepIndex = i),
-          onArrival: () {
-            final s = _order!['status'] as String?;
-            VoiceNavigationService.announceArrival(s == 'delivering' ? 'client' : 'restaurant');
-            setState(() => _isNavigating = false);
-          },
+    try {
+      final status = _order!['status'] as String?;
+      LatLng destination;
+      
+      if (status == 'delivering' || status == 'picked_up') {
+        destination = LatLng(
+          (_order!['delivery_latitude'] as num?)?.toDouble() ?? 36.7538,
+          (_order!['delivery_longitude'] as num?)?.toDouble() ?? 3.0588,
         );
-      });
+      } else {
+        destination = LatLng(
+          (_order!['restaurant']?['latitude'] as num?)?.toDouble() ?? 36.7538,
+          (_order!['restaurant']?['longitude'] as num?)?.toDouble() ?? 3.0588,
+        );
+      }
+
+      final route = await RoutingService.getRoute(_currentPosition!, destination);
+      if (route != null && mounted) {
+        setState(() {
+          _route = route;
+          _tracker = NavigationTracker(
+            route: route,
+            destination: destination,
+            onRerouteNeeded: () {
+              VoiceNavigationService.announceRerouting();
+              _calculateRoute();
+            },
+            onStepChanged: (i) => setState(() => _currentStepIndex = i),
+            onArrival: () {
+              final s = _order!['status'] as String?;
+              VoiceNavigationService.announceArrival(s == 'delivering' ? 'client' : 'restaurant');
+              setState(() => _isNavigating = false);
+            },
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur calcul route: $e');
     }
   }
 
@@ -134,16 +163,34 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   }
 
   Future<void> _pickupOrder() async {
-    await SupabaseService.updateOrderStatus(widget.orderId, 'picked_up');
-    await _loadOrder();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Commande récupérée! En route vers le client'), backgroundColor: Colors.blue),
-    );
+    try {
+      await SupabaseService.updateOrderStatus(widget.orderId, 'picked_up');
+      await _loadOrder();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Commande récupérée! En route vers le client 🚀'), backgroundColor: Colors.blue),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _startDelivering() async {
-    await SupabaseService.updateOrderStatus(widget.orderId, 'delivering');
-    await _loadOrder();
+    try {
+      await SupabaseService.updateOrderStatus(widget.orderId, 'delivering');
+      await _loadOrder();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   /// Afficher le dialog pour entrer le code de confirmation
