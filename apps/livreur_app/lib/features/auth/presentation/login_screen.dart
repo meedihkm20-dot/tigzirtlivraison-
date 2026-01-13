@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/services/supabase_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,24 +11,47 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
-      await Future.delayed(const Duration(seconds: 1));
-      setState(() => _isLoading = false);
-      if (mounted) Navigator.pushReplacementNamed(context, AppRouter.home);
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+      
+      try {
+        final response = await SupabaseService.signIn(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+        
+        if (response.user != null && mounted) {
+          // Vérifier que c'est bien un livreur
+          final profile = await SupabaseService.getLivreurProfile();
+          if (profile != null) {
+            Navigator.pushReplacementNamed(context, AppRouter.home);
+          } else {
+            await SupabaseService.signOut();
+            setState(() => _errorMessage = 'Ce compte n\'est pas un compte livreur');
+          }
+        }
+      } catch (e) {
+        setState(() => _errorMessage = 'Email ou mot de passe incorrect');
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -47,11 +71,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 24),
                 const Text('Connexion Livreur', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                 const SizedBox(height: 48),
+                if (_errorMessage != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                  ),
                 TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Numéro de téléphone', prefixIcon: Icon(Icons.phone), prefixText: '+213 '),
-                  validator: (v) => v == null || v.isEmpty ? 'Veuillez entrer votre numéro' : null,
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email)),
+                  validator: (v) => v == null || v.isEmpty ? 'Veuillez entrer votre email' : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

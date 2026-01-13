@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/services/supabase_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,6 +12,72 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool _isOnline = false;
   int _currentIndex = 0;
+  List<Map<String, dynamic>> _availableOrders = [];
+  List<Map<String, dynamic>> _activeOrders = [];
+  bool _isLoading = false;
+  Map<String, dynamic>? _livreurProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final profile = await SupabaseService.getLivreurProfile();
+    if (profile != null) {
+      setState(() {
+        _livreurProfile = profile;
+        _isOnline = profile['is_online'] ?? false;
+      });
+      if (_isOnline) _loadOrders();
+    }
+  }
+
+  Future<void> _toggleOnline(bool value) async {
+    setState(() => _isOnline = value);
+    await SupabaseService.setOnlineStatus(value);
+    if (value) {
+      _loadOrders();
+    } else {
+      setState(() => _availableOrders = []);
+    }
+  }
+
+  Future<void> _loadOrders() async {
+    if (!_isOnline) return;
+    setState(() => _isLoading = true);
+    try {
+      final available = await SupabaseService.getAvailableOrders(
+        lat: _livreurProfile?['current_latitude'] ?? 36.7538,
+        lng: _livreurProfile?['current_longitude'] ?? 3.0588,
+      );
+      final active = await SupabaseService.getMyActiveOrders();
+      setState(() {
+        _availableOrders = available;
+        _activeOrders = active;
+      });
+    } catch (e) {
+      debugPrint('Erreur chargement commandes: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _acceptOrder(String orderId) async {
+    try {
+      await SupabaseService.acceptOrder(orderId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Commande acceptée!'), backgroundColor: Colors.green),
+      );
+      Navigator.pushNamed(context, AppRouter.orderDetail, arguments: orderId);
+      _loadOrders();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,16 +85,15 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('DZ Delivery Livreur'),
         actions: [
-          Switch(
-            value: _isOnline,
-            onChanged: (v) => setState(() => _isOnline = v),
-            activeColor: Colors.green,
-          ),
+          Switch(value: _isOnline, onChanged: _toggleOnline, activeColor: Colors.green),
           Text(_isOnline ? 'En ligne' : 'Hors ligne', style: TextStyle(color: _isOnline ? Colors.green : Colors.grey)),
           const SizedBox(width: 8),
         ],
       ),
-      body: _isOnline ? _buildOrdersList() : _buildOfflineMessage(),
+      body: RefreshIndicator(
+        onRefresh: _loadOrders,
+        child: _isOnline ? _buildContent() : _buildOfflineMessage(),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (i) {
@@ -59,15 +125,100 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildOrdersList() {
-    return ListView.builder(
+  Widget _buildContent() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
-      itemCount: 3,
-      itemBuilder: (context, index) => _buildOrderCard(context, index),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Commandes actives
+          if (_activeOrders.isNotEmpty) ...[
+            const Text('Livraison en cours', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            ..._activeOrders.map((order) => _buildActiveOrderCard(order)),
+            const SizedBox(height: 24),
+          ],
+          
+          // Commandes disponibles
+          const Text('Commandes disponibles', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          if (_availableOrders.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  children: [
+                    Icon(Icons.inbox, size: 64, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    Text('Aucune commande disponible', style: TextStyle(color: Colors.grey[600])),
+                    const SizedBox(height: 8),
+                    Text('Tirez vers le bas pour actualiser', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                  ],
+                ),
+              ),
+            )
+          else
+            ..._availableOrders.map((order) => _buildOrderCard(order)),
+        ],
+      ),
     );
   }
 
-  Widget _buildOrderCard(BuildContext context, int index) {
+  Widget _buildActiveOrderCard(Map<String, dynamic> order) {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, AppRouter.delivery, arguments: order['id']),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.green.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.green),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Commande #${order['order_number'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(20)),
+                  child: Text(_getStatusText(order['status']), style: const TextStyle(color: Colors.white, fontSize: 12)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(children: [
+              const Icon(Icons.restaurant, size: 16, color: Colors.grey),
+              const SizedBox(width: 8),
+              Text(order['restaurant']?['name'] ?? 'Restaurant', style: TextStyle(color: Colors.grey[600])),
+            ]),
+            const SizedBox(height: 4),
+            Row(children: [
+              const Icon(Icons.location_on, size: 16, color: Colors.grey),
+              const SizedBox(width: 8),
+              Expanded(child: Text(order['delivery_address'] ?? '', style: TextStyle(color: Colors.grey[600]), maxLines: 1, overflow: TextOverflow.ellipsis)),
+            ]),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () => Navigator.pushNamed(context, AppRouter.delivery, arguments: order['id']),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: const Text('Continuer la livraison'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderCard(Map<String, dynamic> order) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -82,7 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Commande #${1000 + index}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text('Commande #${order['order_number'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
@@ -91,21 +242,41 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Row(children: [const Icon(Icons.restaurant, size: 16, color: Colors.grey), const SizedBox(width: 8), Text('Restaurant ${index + 1}', style: TextStyle(color: Colors.grey[600]))]),
+          Row(children: [
+            const Icon(Icons.restaurant, size: 16, color: Colors.grey),
+            const SizedBox(width: 8),
+            Text(order['restaurant']?['name'] ?? 'Restaurant', style: TextStyle(color: Colors.grey[600])),
+          ]),
           const SizedBox(height: 4),
-          Row(children: [const Icon(Icons.location_on, size: 16, color: Colors.grey), const SizedBox(width: 8), Text('2.${index + 1} km', style: TextStyle(color: Colors.grey[600]))]),
+          Row(children: [
+            const Icon(Icons.location_on, size: 16, color: Colors.grey),
+            const SizedBox(width: 8),
+            Expanded(child: Text(order['delivery_address'] ?? '', style: TextStyle(color: Colors.grey[600]), maxLines: 1, overflow: TextOverflow.ellipsis)),
+          ]),
           const SizedBox(height: 4),
-          Row(children: [const Icon(Icons.attach_money, size: 16, color: Colors.green), const SizedBox(width: 8), Text('${150 + index * 50} DA', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold))]),
+          Row(children: [
+            const Icon(Icons.attach_money, size: 16, color: Colors.green),
+            const SizedBox(width: 8),
+            Text('${order['delivery_fee'] ?? 0} DA', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+          ]),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(child: OutlinedButton(onPressed: () {}, child: const Text('Refuser'))),
               const SizedBox(width: 12),
-              Expanded(child: ElevatedButton(onPressed: () => Navigator.pushNamed(context, AppRouter.orderDetail, arguments: 'order_$index'), child: const Text('Accepter'))),
+              Expanded(child: ElevatedButton(onPressed: () => _acceptOrder(order['id']), child: const Text('Accepter'))),
             ],
           ),
         ],
       ),
     );
+  }
+
+  String _getStatusText(String? status) {
+    switch (status) {
+      case 'picked_up': return 'Récupérée';
+      case 'delivering': return 'En livraison';
+      default: return status ?? '';
+    }
   }
 }

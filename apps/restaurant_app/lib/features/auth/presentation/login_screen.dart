@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/services/supabase_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -24,10 +26,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
-      await Future.delayed(const Duration(seconds: 1));
-      setState(() => _isLoading = false);
-      if (mounted) Navigator.pushReplacementNamed(context, AppRouter.home);
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+      
+      try {
+        final response = await SupabaseService.signIn(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+        
+        if (response.user != null && mounted) {
+          // Vérifier que c'est bien un restaurant
+          final restaurant = await SupabaseService.getMyRestaurant();
+          if (restaurant != null) {
+            Navigator.pushReplacementNamed(context, AppRouter.home);
+          } else {
+            await SupabaseService.signOut();
+            setState(() => _errorMessage = 'Ce compte n\'est pas associé à un restaurant');
+          }
+        }
+      } catch (e) {
+        setState(() => _errorMessage = 'Email ou mot de passe incorrect');
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -47,6 +71,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 24),
                 const Text('Connexion Restaurant', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                 const SizedBox(height: 48),
+                if (_errorMessage != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                  ),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,

@@ -1,0 +1,297 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// Service Supabase centralisé pour l'app Livreur
+class SupabaseService {
+  static SupabaseClient get client => Supabase.instance.client;
+  
+  // TODO: Remplacer par vos vraies clés Supabase
+  static const String supabaseUrl = 'https://YOUR_PROJECT_ID.supabase.co';
+  static const String supabaseAnonKey = 'YOUR_ANON_KEY';
+
+  /// Initialise Supabase
+  static Future<void> init() async {
+    await Supabase.initialize(
+      url: supabaseUrl,
+      anonKey: supabaseAnonKey,
+      realtimeClientOptions: const RealtimeClientOptions(
+        eventsPerSecond: 10, // Plus fréquent pour le tracking GPS
+      ),
+    );
+  }
+
+  static User? get currentUser => client.auth.currentUser;
+  static bool get isLoggedIn => currentUser != null;
+
+  // ============================================
+  // AUTH
+  // ============================================
+  
+  static Future<AuthResponse> signIn({
+    required String email,
+    required String password,
+  }) async {
+    return await client.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+  }
+
+  static Future<void> signOut() async {
+    await client.auth.signOut();
+  }
+
+  // ============================================
+  // LIVREUR PROFILE
+  // ============================================
+  
+  /// Récupérer le profil livreur
+  static Future<Map<String, dynamic>?> getLivreurProfile() async {
+    if (currentUser == null) return null;
+    final response = await client
+        .from('livreurs')
+        .select('*, profile:profiles(*)')
+        .eq('user_id', currentUser!.id)
+        .single();
+    return response;
+  }
+
+  /// Mettre à jour le statut en ligne
+  static Future<void> setOnlineStatus(bool isOnline) async {
+    if (currentUser == null) return;
+    await client
+        .from('livreurs')
+        .update({'is_online': isOnline, 'is_available': isOnline})
+        .eq('user_id', currentUser!.id);
+  }
+
+  /// Mettre à jour la disponibilité
+  static Future<void> setAvailability(bool isAvailable) async {
+    if (currentUser == null) return;
+    await client
+        .from('livreurs')
+        .update({'is_available': isAvailable})
+        .eq('user_id', currentUser!.id);
+  }
+
+  // ============================================
+  // LOCATION TRACKING
+  // ============================================
+  
+  /// Mettre à jour la position actuelle
+  static Future<void> updateCurrentLocation(double lat, double lng) async {
+    if (currentUser == null) return;
+    await client
+        .from('livreurs')
+        .update({
+          'current_latitude': lat,
+          'current_longitude': lng,
+        })
+        .eq('user_id', currentUser!.id);
+  }
+
+  /// Enregistrer la position pour une commande (tracking)
+  static Future<void> recordLocationForOrder({
+    required String livreurId,
+    required String orderId,
+    required double lat,
+    required double lng,
+  }) async {
+    await client.from('livreur_locations').insert({
+      'livreur_id': livreurId,
+      'order_id': orderId,
+      'latitude': lat,
+      'longitude': lng,
+    });
+  }
+
+  // ============================================
+  // ORDERS
+  // ============================================
+  
+  /// Récupérer les commandes disponibles (à proximité)
+  static Future<List<Map<String, dynamic>>> getAvailableOrders({
+    required double lat,
+    required double lng,
+    double radiusKm = 5,
+  }) async {
+    final response = await client
+        .from('orders')
+        .select('*, restaurant:restaurants(*), customer:profiles!customer_id(full_name, phone)')
+        .eq('status', 'ready')
+        .isFilter('livreur_id', null)
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  /// Récupérer mes commandes en cours
+  static Future<List<Map<String, dynamic>>> getMyActiveOrders() async {
+    if (currentUser == null) return [];
+    
+    // D'abord récupérer l'ID du livreur
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return [];
+    
+    final response = await client
+        .from('orders')
+        .select('*, restaurant:restaurants(*), customer:profiles!customer_id(full_name, phone, address)')
+        .eq('livreur_id', livreur['id'])
+        .inFilter('status', ['picked_up', 'delivering'])
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  /// Récupérer l'historique des livraisons
+  static Future<List<Map<String, dynamic>>> getDeliveryHistory() async {
+    if (currentUser == null) return [];
+    
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return [];
+    
+    final response = await client
+        .from('orders')
+        .select('*, restaurant:restaurants(name)')
+        .eq('livreur_id', livreur['id'])
+        .eq('status', 'delivered')
+        .order('delivered_at', ascending: false)
+        .limit(50);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  /// Accepter une commande
+  static Future<void> acceptOrder(String orderId) async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return;
+    
+    await client
+        .from('orders')
+        .update({
+          'livreur_id': livreur['id'],
+          'status': 'picked_up',
+          'picked_up_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', orderId);
+    
+    // Marquer comme non disponible
+    await setAvailability(false);
+  }
+
+  /// Mettre à jour le statut de la commande
+  static Future<void> updateOrderStatus(String orderId, String status) async {
+    final updates = <String, dynamic>{'status': status};
+    
+    if (status == 'delivering') {
+      // Rien de spécial
+    } else if (status == 'delivered') {
+      updates['delivered_at'] = DateTime.now().toIso8601String();
+    }
+    
+    await client.from('orders').update(updates).eq('id', orderId);
+    
+    // Si livré, redevenir disponible
+    if (status == 'delivered') {
+      await setAvailability(true);
+    }
+  }
+
+  // ============================================
+  // REALTIME - Nouvelles commandes
+  // ============================================
+  
+  /// S'abonner aux nouvelles commandes disponibles
+  static RealtimeChannel subscribeToNewOrders(
+    void Function(Map<String, dynamic>) onNewOrder,
+  ) {
+    return client
+        .channel('new_orders')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'orders',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'status',
+            value: 'ready',
+          ),
+          callback: (payload) {
+            final order = payload.newRecord;
+            if (order['livreur_id'] == null) {
+              onNewOrder(order);
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  /// S'abonner aux mises à jour de mes commandes
+  static RealtimeChannel subscribeToMyOrders(
+    String livreurId,
+    void Function(Map<String, dynamic>) onUpdate,
+  ) {
+    return client
+        .channel('my_orders_$livreurId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'orders',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'livreur_id',
+            value: livreurId,
+          ),
+          callback: (payload) {
+            onUpdate(payload.newRecord);
+          },
+        )
+        .subscribe();
+  }
+
+  static Future<void> unsubscribe(RealtimeChannel channel) async {
+    await client.removeChannel(channel);
+  }
+
+  // ============================================
+  // EARNINGS
+  // ============================================
+  
+  /// Récupérer les gains
+  static Future<Map<String, dynamic>> getEarnings() async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) {
+      return {'total': 0, 'today': 0, 'week': 0, 'deliveries': 0};
+    }
+    
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final startOfWeek = startOfDay.subtract(Duration(days: now.weekday - 1));
+    
+    final allDeliveries = await client
+        .from('orders')
+        .select('delivery_fee, delivered_at')
+        .eq('livreur_id', livreur['id'])
+        .eq('status', 'delivered');
+    
+    double total = 0;
+    double today = 0;
+    double week = 0;
+    
+    for (final order in allDeliveries) {
+      final fee = (order['delivery_fee'] as num).toDouble();
+      total += fee;
+      
+      final deliveredAt = DateTime.parse(order['delivered_at']);
+      if (deliveredAt.isAfter(startOfDay)) {
+        today += fee;
+      }
+      if (deliveredAt.isAfter(startOfWeek)) {
+        week += fee;
+      }
+    }
+    
+    return {
+      'total': total,
+      'today': today,
+      'week': week,
+      'deliveries': allDeliveries.length,
+    };
+  }
+}

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/services/supabase_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -10,16 +11,61 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  List<Map<String, dynamic>> _restaurants = [];
+  bool _isLoading = true;
+  String _userAddress = 'Alger, Algérie';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      // Charger le profil pour l'adresse
+      final profile = await SupabaseService.getProfile();
+      if (profile != null && profile['address'] != null) {
+        _userAddress = profile['address'];
+      }
+      
+      // Charger les restaurants proches (position par défaut: Alger)
+      final restaurants = await SupabaseService.getNearbyRestaurants(
+        latitude: profile?['latitude'] ?? 36.7538,
+        longitude: profile?['longitude'] ?? 3.0588,
+        radiusKm: 10,
+      );
+      setState(() => _restaurants = restaurants);
+    } catch (e) {
+      debugPrint('Erreur chargement: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _searchRestaurants(String query) async {
+    if (query.isEmpty) {
+      _loadData();
+      return;
+    }
+    try {
+      final results = await SupabaseService.searchRestaurants(query);
+      setState(() => _restaurants = results);
+    } catch (e) {
+      debugPrint('Erreur recherche: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Livrer à', style: TextStyle(fontSize: 12, color: Colors.grey)),
-            Text('Alger, Algérie', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text('Livrer à', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(_userAddress, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ],
         ),
         actions: [
@@ -29,57 +75,75 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Rechercher un restaurant...',
-                  prefixIcon: const Icon(Icons.search),
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: TextField(
+                  onChanged: (v) => _searchRestaurants(v),
+                  decoration: InputDecoration(
+                    hintText: 'Rechercher un restaurant...',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   ),
                 ),
               ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text('Catégories', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 100,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: [
-                  _buildCategoryItem(Icons.fastfood, 'Fast Food'),
-                  _buildCategoryItem(Icons.local_pizza, 'Pizza'),
-                  _buildCategoryItem(Icons.restaurant, 'Traditionnel'),
-                  _buildCategoryItem(Icons.cake, 'Desserts'),
-                  _buildCategoryItem(Icons.local_cafe, 'Café'),
-                ],
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text('Catégories', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
-            ),
-            const SizedBox(height: 24),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text('Restaurants populaires', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 12),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: 5,
-              itemBuilder: (context, index) => _buildRestaurantCard(context, index),
-            ),
-          ],
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 100,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    _buildCategoryItem(Icons.fastfood, 'Fast Food'),
+                    _buildCategoryItem(Icons.local_pizza, 'Pizza'),
+                    _buildCategoryItem(Icons.restaurant, 'Traditionnel'),
+                    _buildCategoryItem(Icons.cake, 'Desserts'),
+                    _buildCategoryItem(Icons.local_cafe, 'Café'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text('Restaurants populaires', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 12),
+              if (_isLoading)
+                const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+              else if (_restaurants.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      children: [
+                        Icon(Icons.restaurant, size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text('Aucun restaurant trouvé', style: TextStyle(color: Colors.grey[600])),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _restaurants.length,
+                  itemBuilder: (context, index) => _buildRestaurantCard(context, _restaurants[index]),
+                ),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -107,10 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Container(
             width: 60,
             height: 60,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF6B35).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-            ),
+            decoration: BoxDecoration(color: const Color(0xFFFF6B35).withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
             child: Icon(icon, color: const Color(0xFFFF6B35), size: 30),
           ),
           const SizedBox(height: 8),
@@ -120,9 +181,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildRestaurantCard(BuildContext context, int index) {
+  Widget _buildRestaurantCard(BuildContext context, Map<String, dynamic> restaurant) {
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, AppRouter.restaurantDetail, arguments: 'restaurant_$index'),
+      onTap: () => Navigator.pushNamed(context, AppRouter.restaurantDetail, arguments: restaurant['id']),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
@@ -138,24 +199,51 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: BoxDecoration(
                 color: Colors.grey[300],
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                image: restaurant['logo_url'] != null
+                    ? DecorationImage(image: NetworkImage(restaurant['logo_url']), fit: BoxFit.cover)
+                    : null,
               ),
-              child: const Center(child: Icon(Icons.restaurant, size: 50, color: Colors.grey)),
+              child: restaurant['logo_url'] == null
+                  ? const Center(child: Icon(Icons.restaurant, size: 50, color: Colors.grey))
+                  : null,
             ),
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Restaurant ${index + 1}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(child: Text(restaurant['name'] ?? 'Restaurant', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                      if (!(restaurant['is_open'] ?? true))
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                          child: const Text('Fermé', style: TextStyle(color: Colors.red, fontSize: 12)),
+                        ),
+                    ],
+                  ),
+                  if (restaurant['cuisine_type'] != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(restaurant['cuisine_type'], style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                    ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       const Icon(Icons.star, size: 16, color: Colors.amber),
-                      const Text(' 4.5 ', style: TextStyle(fontWeight: FontWeight.bold)),
-                      Text('(120 avis)', style: TextStyle(color: Colors.grey[600])),
+                      Text(' ${(restaurant['rating'] ?? 0).toStringAsFixed(1)} ', style: const TextStyle(fontWeight: FontWeight.bold)),
                       const Spacer(),
                       const Icon(Icons.access_time, size: 16, color: Colors.grey),
-                      Text(' 25-35 min', style: TextStyle(color: Colors.grey[600])),
+                      Text(' ${restaurant['avg_prep_time'] ?? 30} min', style: TextStyle(color: Colors.grey[600])),
+                      const SizedBox(width: 12),
+                      if (restaurant['distance_km'] != null)
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                            Text(' ${(restaurant['distance_km'] as num).toStringAsFixed(1)} km', style: TextStyle(color: Colors.grey[600])),
+                          ],
+                        ),
                     ],
                   ),
                 ],
