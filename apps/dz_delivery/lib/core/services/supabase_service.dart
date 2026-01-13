@@ -53,7 +53,6 @@ class SupabaseService {
     required String password,
     required String fullName,
     required String phone,
-    bool phoneVerified = false,
   }) async {
     return await client.auth.signUp(
       email: email,
@@ -62,7 +61,6 @@ class SupabaseService {
         'full_name': fullName,
         'phone': phone,
         'role': 'customer',
-        'phone_verified': phoneVerified,
       },
     );
   }

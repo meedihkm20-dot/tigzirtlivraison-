@@ -5,13 +5,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/services/supabase_service.dart';
-import 'core/services/firebase_auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   await SupabaseService.init();
-  await FirebaseAuthService.init();
   await Hive.initFlutter();
   await Hive.openBox('settings');
   await Hive.openBox('cart');

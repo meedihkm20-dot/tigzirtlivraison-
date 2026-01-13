@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/supabase_service.dart';
-import '../../../core/services/firebase_auth_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
-import 'phone_verification_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -18,64 +16,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   bool _obscurePassword = true;
-  bool _phoneVerified = false;
 
-  // Champs communs
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
-
-  // Champs restaurant
   final _restaurantNameController = TextEditingController();
   final _addressController = TextEditingController();
-
-  // Champs livreur
   String _vehicleType = 'moto';
-
-  Future<void> _verifyPhone() async {
-    final phone = _phoneController.text.trim();
-    if (phone.isEmpty) {
-      setState(() => _errorMessage = 'Entrez votre numéro de téléphone');
-      return;
-    }
-
-    if (!FirebaseAuthService.isValidAlgerianPhone(phone)) {
-      setState(() => _errorMessage = 'Numéro algérien invalide (ex: 0555123456)');
-      return;
-    }
-
-    setState(() => _errorMessage = null);
-
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PhoneVerificationScreen(
-          phoneNumber: phone,
-          onVerified: () => Navigator.pop(context, true),
-        ),
-      ),
-    );
-
-    if (result == true) {
-      setState(() => _phoneVerified = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✓ Numéro vérifié avec succès!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
-  }
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
-
-    // Pour les clients, vérifier que le téléphone est vérifié
-    if (_selectedRole == 'customer' && !_phoneVerified) {
-      setState(() => _errorMessage = 'Veuillez d\'abord vérifier votre numéro de téléphone');
-      return;
-    }
 
     setState(() {
       _isLoading = true;
@@ -90,12 +41,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             password: _passwordController.text,
             fullName: _fullNameController.text.trim(),
             phone: _phoneController.text.trim(),
-            phoneVerified: true, // Téléphone vérifié via Firebase
           );
-          if (mounted) {
-            // Afficher message de vérification email
-            _showEmailVerificationDialog();
-          }
+          if (mounted) _showEmailVerificationDialog();
           break;
 
         case 'restaurant':
@@ -122,7 +69,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           break;
       }
     } catch (e) {
-      setState(() => _errorMessage = 'Erreur lors de l\'inscription: ${e.toString()}');
+      setState(() => _errorMessage = 'Erreur: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -144,7 +91,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Un email de confirmation a été envoyé à:'),
+            const Text('Un email de confirmation a été envoyé à:'),
             const SizedBox(height: 8),
             Text(
               _emailController.text.trim(),
@@ -200,7 +147,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   child: Text(_errorMessage!, style: const TextStyle(color: AppTheme.errorColor)),
                 ),
-              // Champs communs
               TextFormField(
                 controller: _fullNameController,
                 decoration: InputDecoration(
@@ -221,81 +167,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              // Téléphone avec bouton de vérification (pour clients)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      enabled: !_phoneVerified,
-                      decoration: InputDecoration(
-                        labelText: 'Téléphone',
-                        prefixIcon: const Icon(Icons.phone_outlined),
-                        hintText: '0555123456',
-                        suffixIcon: _phoneVerified
-                            ? const Icon(Icons.check_circle, color: Colors.green)
-                            : null,
-                      ),
-                      validator: (v) => v == null || v.isEmpty ? 'Champ requis' : null,
-                      onChanged: (_) {
-                        if (_phoneVerified) {
-                          setState(() => _phoneVerified = false);
-                        }
-                      },
-                    ),
-                  ),
-                  if (_selectedRole == 'customer' && !_phoneVerified) ...[
-                    const SizedBox(width: 8),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: ElevatedButton(
-                        onPressed: _verifyPhone,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.secondaryColor,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        ),
-                        child: const Text('Vérifier'),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              // Info vérification pour clients
-              if (_selectedRole == 'customer') ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _phoneVerified 
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _phoneVerified ? Icons.verified : Icons.info_outline,
-                        color: _phoneVerified ? Colors.green : Colors.orange,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _phoneVerified
-                              ? 'Numéro vérifié ✓'
-                              : 'Vérification SMS requise pour les clients',
-                          style: TextStyle(
-                            color: _phoneVerified ? Colors.green[700] : Colors.orange[700],
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Téléphone',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                  hintText: '0555123456',
                 ),
-              ],
+                validator: (v) => v == null || v.isEmpty ? 'Champ requis' : null,
+              ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _passwordController,
@@ -310,7 +191,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 validator: (v) => v == null || v.length < 6 ? 'Minimum 6 caractères' : null,
               ),
-              // Champs restaurant
               if (_selectedRole == 'restaurant') ...[
                 const SizedBox(height: 16),
                 TextFormField(
@@ -325,7 +205,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   validator: (v) => v == null || v.isEmpty ? 'Champ requis' : null,
                 ),
               ],
-              // Champs livreur
               if (_selectedRole == 'livreur') ...[
                 const SizedBox(height: 16),
                 const Text('Type de véhicule', style: TextStyle(fontWeight: FontWeight.w500)),
@@ -340,11 +219,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                 ),
               ],
-              const SizedBox(height: 32),
-              // Info validation
-              if (_selectedRole != 'customer')
+              const SizedBox(height: 24),
+              // Info vérification email pour clients
+              if (_selectedRole == 'customer')
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
                     color: Colors.blue.withValues(alpha: 0.1),
@@ -352,12 +231,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline, color: Colors.blue),
-                      const SizedBox(width: 12),
+                      const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Votre compte sera validé par l\'administrateur avant activation.',
-                          style: TextStyle(color: Colors.blue[700]),
+                          'Un email de confirmation vous sera envoyé',
+                          style: TextStyle(color: Colors.blue[700], fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              // Info validation admin
+              if (_selectedRole != 'customer')
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.admin_panel_settings, color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Votre compte sera validé par l\'administrateur',
+                          style: TextStyle(color: Colors.orange[700], fontSize: 13),
                         ),
                       ),
                     ],
@@ -394,10 +295,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final isSelected = _selectedRole == role;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() {
-          _selectedRole = role;
-          _phoneVerified = false; // Reset phone verification when changing role
-        }),
+        onTap: () => setState(() => _selectedRole = role),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
