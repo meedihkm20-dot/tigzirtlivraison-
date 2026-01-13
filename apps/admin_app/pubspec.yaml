@@ -1,0 +1,30 @@
+name: dz_delivery_admin
+description: DZ Delivery - Application Admin
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.6.1
+  supabase_flutter: ^2.8.0
+  dio: ^5.7.0
+  shared_preferences: ^2.3.3
+  intl: ^0.19.0
+  fl_chart: ^0.69.2
+  cupertino_icons: ^1.0.8
+  data_table_2: ^2.5.15
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/

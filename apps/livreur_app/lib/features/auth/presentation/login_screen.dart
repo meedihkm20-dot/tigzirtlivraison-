@@ -38,13 +38,16 @@ class _LoginScreenState extends State<LoginScreen> {
         );
         
         if (response.user != null && mounted) {
-          // Vérifier que c'est bien un livreur
+          // Vérifier que c'est bien un livreur ET qu'il est vérifié
           final profile = await SupabaseService.getLivreurProfile();
           if (profile != null) {
-            Navigator.pushReplacementNamed(context, AppRouter.home);
+            if (profile['is_verified'] == true) {
+              Navigator.pushReplacementNamed(context, AppRouter.home);
+            } else {
+              Navigator.pushReplacementNamed(context, AppRouter.pendingApproval);
+            }
           } else {
-            await SupabaseService.signOut();
-            setState(() => _errorMessage = 'Ce compte n\'est pas un compte livreur');
+            Navigator.pushReplacementNamed(context, AppRouter.pendingApproval);
           }
         }
       } catch (e) {
@@ -99,6 +102,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 ElevatedButton(
                   onPressed: _isLoading ? null : _login,
                   child: _isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Se connecter'),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => Navigator.pushNamed(context, AppRouter.register),
+                  child: const Text('Devenir livreur ? S\'inscrire'),
                 ),
               ],
             ),

@@ -35,6 +35,38 @@ class SupabaseService {
     );
   }
 
+  /// Inscription livreur (non vérifié par défaut)
+  static Future<AuthResponse> signUpLivreur({
+    required String email,
+    required String password,
+    required String fullName,
+    required String phone,
+    required String vehicleType,
+  }) async {
+    final response = await client.auth.signUp(
+      email: email,
+      password: password,
+      data: {
+        'full_name': fullName,
+        'phone': phone,
+        'role': 'livreur',
+      },
+    );
+    
+    // Créer le livreur (non vérifié)
+    if (response.user != null) {
+      await client.from('livreurs').insert({
+        'user_id': response.user!.id,
+        'vehicle_type': vehicleType,
+        'is_verified': false,
+        'is_online': false,
+        'is_available': false,
+      });
+    }
+    
+    return response;
+  }
+
   static Future<void> signOut() async {
     await client.auth.signOut();
   }

@@ -38,13 +38,17 @@ class _LoginScreenState extends State<LoginScreen> {
         );
         
         if (response.user != null && mounted) {
-          // Vérifier que c'est bien un restaurant
+          // Vérifier que c'est bien un restaurant ET qu'il est vérifié
           final restaurant = await SupabaseService.getMyRestaurant();
           if (restaurant != null) {
-            Navigator.pushReplacementNamed(context, AppRouter.home);
+            if (restaurant['is_verified'] == true) {
+              Navigator.pushReplacementNamed(context, AppRouter.home);
+            } else {
+              Navigator.pushReplacementNamed(context, AppRouter.pendingApproval);
+            }
           } else {
-            await SupabaseService.signOut();
-            setState(() => _errorMessage = 'Ce compte n\'est pas associé à un restaurant');
+            // Pas de restaurant associé, peut-être en cours de création
+            Navigator.pushReplacementNamed(context, AppRouter.pendingApproval);
           }
         }
       } catch (e) {
@@ -99,6 +103,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 ElevatedButton(
                   onPressed: _isLoading ? null : _login,
                   child: _isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Se connecter'),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => Navigator.pushNamed(context, AppRouter.register),
+                  child: const Text('Pas encore inscrit ? Créer un compte'),
                 ),
               ],
             ),

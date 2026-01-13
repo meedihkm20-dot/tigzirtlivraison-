@@ -35,6 +35,42 @@ class SupabaseService {
     );
   }
 
+  /// Inscription restaurant (non vérifié par défaut)
+  static Future<AuthResponse> signUpRestaurant({
+    required String email,
+    required String password,
+    required String ownerName,
+    required String restaurantName,
+    required String phone,
+    required String address,
+  }) async {
+    final response = await client.auth.signUp(
+      email: email,
+      password: password,
+      data: {
+        'full_name': ownerName,
+        'phone': phone,
+        'role': 'restaurant',
+      },
+    );
+    
+    // Créer le restaurant (non vérifié)
+    if (response.user != null) {
+      await client.from('restaurants').insert({
+        'owner_id': response.user!.id,
+        'name': restaurantName,
+        'address': address,
+        'phone': phone,
+        'latitude': 36.8869, // Tigzirt par défaut
+        'longitude': 4.1260,
+        'is_verified': false, // En attente de validation
+        'is_open': false,
+      });
+    }
+    
+    return response;
+  }
+
   static Future<void> signOut() async {
     await client.auth.signOut();
   }

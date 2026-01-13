@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../features/splash/splash_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/register_screen.dart';
+import '../../features/auth/presentation/pending_approval_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/orders/presentation/order_detail_screen.dart';
 import '../../features/menu/presentation/menu_screen.dart';
@@ -11,6 +13,8 @@ import '../../features/profile/presentation/profile_screen.dart';
 class AppRouter {
   static const String splash = '/';
   static const String login = '/login';
+  static const String register = '/register';
+  static const String pendingApproval = '/pending-approval';
   static const String home = '/home';
   static const String orderDetail = '/order-detail';
   static const String menu = '/menu';
@@ -24,6 +28,10 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const SplashScreen());
       case login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
+      case register:
+        return MaterialPageRoute(builder: (_) => const RegisterScreen());
+      case pendingApproval:
+        return MaterialPageRoute(builder: (_) => const PendingApprovalScreen());
       case home:
         return MaterialPageRoute(builder: (_) => const HomeScreen());
       case orderDetail:
