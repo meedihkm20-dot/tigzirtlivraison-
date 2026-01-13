@@ -151,7 +151,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [AppTheme.primaryColor, AppTheme.primaryColor.withOpacity(0.8)],
+                      colors: [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.8)],
                     ),
                   ),
                   child: SafeArea(
@@ -182,7 +182,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
+                                      color: Colors.white.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Row(
@@ -229,7 +229,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
-                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)],
+                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
                             ),
                             child: TextField(
                               controller: _searchController,
@@ -357,7 +357,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10)],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10)],
         ),
         child: Stack(
           children: [
@@ -453,7 +453,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10)],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10)],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,7 +471,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         )
                       : Container(
                           height: 100,
-                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          color: AppTheme.primaryColor.withValues(alpha: 0.1),
                           child: Center(
                             child: Text(
                               (restaurant['name'] ?? 'R')[0].toUpperCase(),
@@ -545,7 +545,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       leading: CircleAvatar(
         radius: 28,
-        backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+        backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
         backgroundImage: restaurant['logo_url'] != null ? CachedNetworkImageProvider(restaurant['logo_url']) : null,
         child: restaurant['logo_url'] == null
             ? Text((restaurant['name'] ?? 'R')[0], style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold))
@@ -579,7 +579,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -644,7 +644,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -5))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, -5))],
       ),
       child: SafeArea(
         child: Padding(

@@ -116,7 +116,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -176,7 +176,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isEarned ? AppTheme.primaryColor.withOpacity(0.1) : Colors.grey[100],
+            color: isEarned ? AppTheme.primaryColor.withValues(alpha: 0.1) : Colors.grey[100],
             borderRadius: BorderRadius.circular(16),
             border: isEarned ? Border.all(color: AppTheme.primaryColor, width: 2) : null,
           ),

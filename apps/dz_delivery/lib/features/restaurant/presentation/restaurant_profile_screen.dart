@@ -246,7 +246,7 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
                                   gradient: LinearGradient(
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
-                                    colors: [AppTheme.primaryColor, AppTheme.primaryColor.withOpacity(0.7)],
+                                    colors: [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.7)],
                                   ),
                                 ),
                               ),
@@ -256,7 +256,7 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
-                              colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
                             ),
                           ),
                         ),
@@ -269,7 +269,7 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white.withValues(alpha: 0.9),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: _isUploading
@@ -310,7 +310,7 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
                                   color: Colors.white,
                                   shape: BoxShape.circle,
                                   border: Border.all(color: Colors.white, width: 4),
-                                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10)],
+                                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10)],
                                   image: _restaurant?['logo_url'] != null
                                       ? DecorationImage(image: NetworkImage(_restaurant!['logo_url']), fit: BoxFit.cover)
                                       : null,
@@ -355,7 +355,7 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withOpacity(0.1),
+                              color: AppTheme.primaryColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(_restaurant!['cuisine_type'], style: TextStyle(color: AppTheme.primaryColor)),
@@ -442,7 +442,7 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.1),
+              color: AppTheme.primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: AppTheme.primaryColor, size: 20),

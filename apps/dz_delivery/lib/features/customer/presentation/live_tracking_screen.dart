@@ -186,9 +186,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> with TickerProv
                   polylines: [
                     Polyline(
                       points: [_livreurPosition!, _customerPosition!],
-                      color: AppTheme.primaryColor.withOpacity(0.5),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.5),
                       strokeWidth: 3,
-                      isDotted: true,
+                      pattern: const StrokePattern.dotted(),
                     ),
                   ],
                 ),
@@ -206,7 +206,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> with TickerProv
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+                  colors: [Colors.black.withValues(alpha: 0.7), Colors.transparent],
                 ),
               ),
               child: Padding(
@@ -243,7 +243,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> with TickerProv
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20)],
               ),
               child: SafeArea(
                 child: Padding(
@@ -258,7 +258,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> with TickerProv
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                             decoration: BoxDecoration(
-                              color: _getStatusColor(status).withOpacity(0.1 + (_pulseController.value * 0.1)),
+                              color: _getStatusColor(status).withValues(alpha: 0.1 + (_pulseController.value * 0.1)),
                               borderRadius: BorderRadius.circular(30),
                               border: Border.all(color: _getStatusColor(status)),
                             ),
@@ -341,7 +341,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> with TickerProv
                             children: [
                               CircleAvatar(
                                 radius: 25,
-                                backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                                 child: Text(
                                   (livreurProfile?['full_name'] ?? 'L')[0].toUpperCase(),
                                   style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold),
@@ -494,7 +494,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> with TickerProv
                   width: 50 * (1 + _pulseController.value * 0.3),
                   height: 50 * (1 + _pulseController.value * 0.3),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.3 * (1 - _pulseController.value)),
+                    color: Colors.green.withValues(alpha: 0.3 * (1 - _pulseController.value)),
                     shape: BoxShape.circle,
                   ),
                 ),

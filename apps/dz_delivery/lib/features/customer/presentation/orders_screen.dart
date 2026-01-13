@@ -72,7 +72,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,7 +83,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 Text('#${order['order_number'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.bold)),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(color: statusInfo['color'].withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                  decoration: BoxDecoration(color: statusInfo['color'].withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
                   child: Text(statusInfo['text'], style: TextStyle(color: statusInfo['color'], fontSize: 12)),
                 ),
               ],

@@ -316,7 +316,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                  colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+                  colors: [Colors.black.withValues(alpha: 0.7), Colors.transparent],
                 ),
               ),
               child: Padding(
@@ -343,7 +343,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(_route!.steps[_currentStepIndex].instruction, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text('${_route!.steps[_currentStepIndex].formattedDistance} - ${_route!.formattedDuration}', style: TextStyle(color: Colors.white.withOpacity(0.8))),
+                    Text('${_route!.steps[_currentStepIndex].formattedDistance} - ${_route!.formattedDuration}', style: TextStyle(color: Colors.white.withValues(alpha: 0.8))),
                   ],
                 ),
               ),
@@ -357,7 +357,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
               ),
               child: SafeArea(
                 child: Column(
@@ -366,7 +366,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                     // Status
                     Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: _getStatusColor(status).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                      decoration: BoxDecoration(color: _getStatusColor(status).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                       child: Row(
                         children: [
                           Icon(isAtClient ? Icons.delivery_dining : Icons.restaurant, color: _getStatusColor(status)),
@@ -401,7 +401,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                            decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                             child: Column(
                               children: [
                                 const Text('À collecter', style: TextStyle(fontSize: 12)),
@@ -414,7 +414,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                            decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                             child: Column(
                               children: [
                                 const Text('Votre gain', style: TextStyle(fontSize: 12)),

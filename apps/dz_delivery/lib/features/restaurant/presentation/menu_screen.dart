@@ -691,7 +691,7 @@ class _MenuScreenState extends State<MenuScreen> with SingleTickerProviderStateM
                         margin: const EdgeInsets.only(top: 4),
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.1),
+                          color: Colors.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: const Text('Indisponible', style: TextStyle(color: Colors.red, fontSize: 10)),
@@ -715,7 +715,7 @@ class _MenuScreenState extends State<MenuScreen> with SingleTickerProviderStateM
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
           child: const Icon(Icons.category, color: AppTheme.primaryColor),
         ),
         title: Text(category['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),

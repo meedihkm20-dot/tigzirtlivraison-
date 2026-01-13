@@ -151,7 +151,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> with Si
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
                       ),
                     ),
                   ),
@@ -192,7 +192,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> with Si
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withOpacity(0.1),
+                        color: AppTheme.primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(_restaurant!['cuisine_type'], style: TextStyle(color: AppTheme.primaryColor, fontSize: 12)),
@@ -237,7 +237,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> with Si
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -5))],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, -5))],
               ),
               child: SafeArea(
                 child: ElevatedButton(
@@ -320,7 +320,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> with Si
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -329,7 +329,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> with Si
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                 backgroundImage: customer?['avatar_url'] != null ? NetworkImage(customer!['avatar_url']) : null,
                 child: customer?['avatar_url'] == null
                     ? Text(

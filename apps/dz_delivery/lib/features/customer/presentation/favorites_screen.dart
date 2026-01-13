@@ -106,7 +106,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                     height: 70,
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(12),
-                                      color: AppTheme.primaryColor.withOpacity(0.1),
+                                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
                                       image: restaurant['logo_url'] != null
                                           ? DecorationImage(
                                               image: CachedNetworkImageProvider(restaurant['logo_url']),

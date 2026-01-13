@@ -145,7 +145,7 @@ class _ReorderScreenState extends State<ReorderScreen> {
                     height: 50,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
-                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
                       image: restaurant?['logo_url'] != null
                           ? DecorationImage(
                               image: CachedNetworkImageProvider(restaurant!['logo_url']),

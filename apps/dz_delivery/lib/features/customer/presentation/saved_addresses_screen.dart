@@ -245,7 +245,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                           child: ListTile(
                             leading: CircleAvatar(
                               backgroundColor: isDefault 
-                                  ? AppTheme.primaryColor.withOpacity(0.1)
+                                  ? AppTheme.primaryColor.withValues(alpha: 0.1)
                                   : Colors.grey[100],
                               child: Icon(
                                 _getLabelIcon(address['label'] ?? ''),

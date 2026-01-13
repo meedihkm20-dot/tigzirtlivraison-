@@ -96,10 +96,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       final sentAt = DateTime.tryParse(notif['sent_at'] ?? '');
                       
                       return Container(
-                        color: isRead ? null : AppTheme.primaryColor.withOpacity(0.05),
+                        color: isRead ? null : AppTheme.primaryColor.withValues(alpha: 0.05),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: _getColor(type).withOpacity(0.1),
+                            backgroundColor: _getColor(type).withValues(alpha: 0.1),
                             child: Icon(_getIcon(type), color: _getColor(type)),
                           ),
                           title: Text(

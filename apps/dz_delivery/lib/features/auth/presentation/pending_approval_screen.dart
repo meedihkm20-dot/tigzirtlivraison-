@@ -48,7 +48,7 @@ class PendingApprovalScreen extends StatelessWidget {
                 width: 120,
                 height: 120,
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(60),
                 ),
                 child: const Icon(Icons.hourglass_empty, size: 60, color: Colors.orange),
@@ -120,7 +120,7 @@ class PendingApprovalScreen extends StatelessWidget {
           Container(
             width: 56,
             height: 56,
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
             child: Icon(icon, color: color, size: 28),
           ),
           const SizedBox(height: 8),

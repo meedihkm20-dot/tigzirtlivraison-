@@ -171,7 +171,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: orderColor, width: 3),
-        boxShadow: [BoxShadow(color: orderColor.withOpacity(0.3), blurRadius: 8)],
+        boxShadow: [BoxShadow(color: orderColor.withValues(alpha: 0.3), blurRadius: 8)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,7 +180,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: orderColor.withOpacity(0.1),
+              color: orderColor.withValues(alpha: 0.1),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
             ),
             child: Row(
@@ -272,7 +272,7 @@ class _KitchenScreenState extends State<KitchenScreen> {
           if (livreur != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              color: Colors.blue.withOpacity(0.1),
+              color: Colors.blue.withValues(alpha: 0.1),
               child: Row(
                 children: [
                   const Icon(Icons.delivery_dining, size: 16, color: Colors.blue),

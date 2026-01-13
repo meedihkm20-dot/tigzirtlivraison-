@@ -165,7 +165,7 @@ Télécharge l'app et commande tes plats préférés!
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
                           ),
                           child: Column(
                             children: [
@@ -179,7 +179,7 @@ Télécharge l'app et commande tes plats préférés!
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.primaryColor.withOpacity(0.1),
+                                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(color: AppTheme.primaryColor, width: 2),
                                   ),
@@ -312,7 +312,7 @@ Télécharge l'app et commande tes plats préférés!
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -372,7 +372,7 @@ Télécharge l'app et commande tes plats préférés!
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: isRewarded ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+            backgroundColor: isRewarded ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
             child: Icon(
               isRewarded ? Icons.check : Icons.hourglass_empty,
               color: isRewarded ? Colors.green : Colors.orange,
