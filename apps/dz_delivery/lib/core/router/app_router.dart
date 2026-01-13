@@ -11,17 +11,21 @@ import '../../features/customer/presentation/cart_screen.dart';
 import '../../features/customer/presentation/orders_screen.dart';
 import '../../features/customer/presentation/order_tracking_screen.dart';
 import '../../features/customer/presentation/customer_profile_screen.dart';
+import '../../features/customer/presentation/review_screen.dart';
 // Restaurant
 import '../../features/restaurant/presentation/restaurant_home_screen.dart';
 import '../../features/restaurant/presentation/menu_screen.dart';
 import '../../features/restaurant/presentation/restaurant_order_detail_screen.dart';
 import '../../features/restaurant/presentation/stats_screen.dart';
 import '../../features/restaurant/presentation/restaurant_profile_screen.dart';
+import '../../features/restaurant/presentation/kitchen_screen.dart';
+import '../../features/restaurant/presentation/promotions_screen.dart';
 // Livreur
 import '../../features/livreur/presentation/livreur_home_screen.dart';
 import '../../features/livreur/presentation/delivery_screen.dart';
 import '../../features/livreur/presentation/earnings_screen.dart';
 import '../../features/livreur/presentation/livreur_profile_screen.dart';
+import '../../features/livreur/presentation/badges_screen.dart';
 
 class AppRouter {
   // Auth
@@ -37,6 +41,7 @@ class AppRouter {
   static const String customerOrders = '/customer/orders';
   static const String orderTracking = '/customer/order-tracking';
   static const String customerProfile = '/customer/profile';
+  static const String review = '/customer/review';
   
   // Restaurant
   static const String restaurantHome = '/restaurant/home';
@@ -44,12 +49,15 @@ class AppRouter {
   static const String restaurantOrderDetail = '/restaurant/order';
   static const String stats = '/restaurant/stats';
   static const String restaurantProfile = '/restaurant/profile';
+  static const String kitchen = '/restaurant/kitchen';
+  static const String promotions = '/restaurant/promotions';
   
   // Livreur
   static const String livreurHome = '/livreur/home';
   static const String delivery = '/livreur/delivery';
   static const String earnings = '/livreur/earnings';
   static const String livreurProfile = '/livreur/profile';
+  static const String badges = '/livreur/badges';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -103,6 +111,23 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const EarningsScreen());
       case livreurProfile:
         return MaterialPageRoute(builder: (_) => const LivreurProfileScreen());
+      case badges:
+        return MaterialPageRoute(builder: (_) => const BadgesScreen());
+      
+      // Customer - Review
+      case review:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(builder: (_) => ReviewScreen(
+          orderId: args['orderId'],
+          restaurantName: args['restaurantName'],
+          livreurName: args['livreurName'],
+        ));
+      
+      // Restaurant - Kitchen & Promotions
+      case kitchen:
+        return MaterialPageRoute(builder: (_) => const KitchenScreen());
+      case promotions:
+        return MaterialPageRoute(builder: (_) => const PromotionsScreen());
       
       default:
         return MaterialPageRoute(

@@ -62,6 +62,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Widget _buildOrderCard(Map<String, dynamic> order) {
     final status = order['status'] as String?;
     final statusInfo = _getStatusInfo(status);
+    final isDelivered = status == 'delivered';
     
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, AppRouter.orderTracking, arguments: order['id']),
@@ -103,6 +104,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 Text(_formatDate(order['created_at']), style: TextStyle(color: Colors.grey[400], fontSize: 12)),
               ],
             ),
+            if (isDelivered) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.pushNamed(context, AppRouter.review, arguments: {
+                    'orderId': order['id'],
+                    'restaurantName': order['restaurant']?['name'] ?? 'Restaurant',
+                    'livreurName': null, // TODO: get livreur name
+                  }),
+                  icon: const Icon(Icons.star, size: 18),
+                  label: const Text('Donner mon avis'),
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.amber),
+                ),
+              ),
+            ],
           ],
         ),
       ),

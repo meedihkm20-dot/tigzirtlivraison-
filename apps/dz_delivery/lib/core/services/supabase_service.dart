@@ -557,4 +557,285 @@ class SupabaseService {
     await client.storage.from(bucket).uploadBinary(path, bytes);
     return client.storage.from(bucket).getPublicUrl(path);
   }
+
+  // ============================================
+  // FAVORIS CLIENT
+  // ============================================
+
+  static Future<List<Map<String, dynamic>>> getFavoriteRestaurants() async {
+    if (currentUser == null) return [];
+    final response = await client.from('favorites')
+        .select('*, restaurant:restaurants(*)')
+        .eq('customer_id', currentUser!.id);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<void> toggleFavoriteRestaurant(String restaurantId) async {
+    if (currentUser == null) return;
+    final existing = await client.from('favorites')
+        .select().eq('customer_id', currentUser!.id).eq('restaurant_id', restaurantId).maybeSingle();
+    
+    if (existing != null) {
+      await client.from('favorites').delete().eq('id', existing['id']);
+    } else {
+      await client.from('favorites').insert({'customer_id': currentUser!.id, 'restaurant_id': restaurantId});
+    }
+  }
+
+  static Future<bool> isFavoriteRestaurant(String restaurantId) async {
+    if (currentUser == null) return false;
+    final existing = await client.from('favorites')
+        .select().eq('customer_id', currentUser!.id).eq('restaurant_id', restaurantId).maybeSingle();
+    return existing != null;
+  }
+
+  // ============================================
+  // PROMOTIONS
+  // ============================================
+
+  static Future<List<Map<String, dynamic>>> getActivePromotions(String? restaurantId) async {
+    var query = client.from('promotions').select()
+        .eq('is_active', true)
+        .lte('starts_at', DateTime.now().toIso8601String());
+    
+    if (restaurantId != null) {
+      query = query.eq('restaurant_id', restaurantId);
+    }
+    
+    final response = await query.order('discount_value', ascending: false);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<Map<String, dynamic>> applyPromoCode(String orderId, String code) async {
+    final result = await client.rpc('apply_promotion', params: {
+      'p_order_id': orderId,
+      'p_promo_code': code,
+    });
+    if (result is List && result.isNotEmpty) return Map<String, dynamic>.from(result.first);
+    return {'success': false, 'discount': 0, 'message': 'Erreur'};
+  }
+
+  // Restaurant: Créer une promo
+  static Future<void> createPromotion({
+    required String name,
+    String? description,
+    required String discountType,
+    required double discountValue,
+    double minOrderAmount = 0,
+    double? maxDiscount,
+    String? code,
+    DateTime? endsAt,
+    int? usageLimit,
+  }) async {
+    final restaurant = await getMyRestaurant();
+    if (restaurant == null) return;
+    
+    await client.from('promotions').insert({
+      'restaurant_id': restaurant['id'],
+      'name': name,
+      'description': description,
+      'discount_type': discountType,
+      'discount_value': discountValue,
+      'min_order_amount': minOrderAmount,
+      'max_discount': maxDiscount,
+      'code': code,
+      'ends_at': endsAt?.toIso8601String(),
+      'usage_limit': usageLimit,
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> getMyPromotions() async {
+    final restaurant = await getMyRestaurant();
+    if (restaurant == null) return [];
+    final response = await client.from('promotions')
+        .select().eq('restaurant_id', restaurant['id']).order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<void> togglePromotion(String promoId, bool isActive) async {
+    await client.from('promotions').update({'is_active': isActive}).eq('id', promoId);
+  }
+
+  // ============================================
+  // AVIS ET NOTATIONS
+  // ============================================
+
+  static Future<bool> submitReview({
+    required String orderId,
+    required int restaurantRating,
+    required int livreurRating,
+    String? comment,
+  }) async {
+    final result = await client.rpc('submit_review', params: {
+      'p_order_id': orderId,
+      'p_restaurant_rating': restaurantRating,
+      'p_livreur_rating': livreurRating,
+      'p_comment': comment,
+    });
+    return result == true;
+  }
+
+  static Future<List<Map<String, dynamic>>> getRestaurantReviews(String restaurantId) async {
+    final response = await client.from('reviews')
+        .select('*, customer:profiles!customer_id(full_name, avatar_url)')
+        .eq('restaurant_id', restaurantId)
+        .order('created_at', ascending: false)
+        .limit(50);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<Map<String, dynamic>?> getOrderReview(String orderId) async {
+    return await client.from('reviews').select().eq('order_id', orderId).maybeSingle();
+  }
+
+  // ============================================
+  // MENU AMÉLIORÉ (Photos, Variantes, Extras)
+  // ============================================
+
+  static Future<void> updateMenuItem({
+    required String itemId,
+    String? name,
+    String? description,
+    double? price,
+    String? imageUrl,
+    bool? isAvailable,
+    bool? isPopular,
+    bool? isVegetarian,
+    bool? isSpicy,
+    int? prepTime,
+  }) async {
+    final updates = <String, dynamic>{};
+    if (name != null) updates['name'] = name;
+    if (description != null) updates['description'] = description;
+    if (price != null) updates['price'] = price;
+    if (imageUrl != null) updates['image_url'] = imageUrl;
+    if (isAvailable != null) updates['is_available'] = isAvailable;
+    if (isPopular != null) updates['is_popular'] = isPopular;
+    if (isVegetarian != null) updates['is_vegetarian'] = isVegetarian;
+    if (isSpicy != null) updates['is_spicy'] = isSpicy;
+    if (prepTime != null) updates['prep_time'] = prepTime;
+    
+    if (updates.isNotEmpty) {
+      await client.from('menu_items').update(updates).eq('id', itemId);
+    }
+  }
+
+  static Future<void> deleteMenuItem(String itemId) async {
+    await client.from('menu_items').delete().eq('id', itemId);
+  }
+
+  static Future<void> addMenuCategory({required String name, String? description}) async {
+    final restaurant = await getMyRestaurant();
+    if (restaurant == null) return;
+    
+    final maxOrder = await client.from('menu_categories')
+        .select('sort_order').eq('restaurant_id', restaurant['id'])
+        .order('sort_order', ascending: false).limit(1);
+    
+    final nextOrder = (maxOrder.isNotEmpty ? (maxOrder.first['sort_order'] as int) : 0) + 1;
+    
+    await client.from('menu_categories').insert({
+      'restaurant_id': restaurant['id'],
+      'name': name,
+      'description': description,
+      'sort_order': nextOrder,
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> getPopularItems(String restaurantId) async {
+    final response = await client.from('menu_items')
+        .select('*, category:menu_categories(name)')
+        .eq('restaurant_id', restaurantId)
+        .eq('is_available', true)
+        .order('order_count', ascending: false)
+        .limit(10);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // ============================================
+  // CUISINE (KDS) - Commandes en préparation
+  // ============================================
+
+  static Future<List<Map<String, dynamic>>> getKitchenOrders() async {
+    final restaurant = await getMyRestaurant();
+    if (restaurant == null) return [];
+    
+    final response = await client.from('orders')
+        .select('*, order_items(*), livreur:livreurs(*, profile:profiles(full_name, phone))')
+        .eq('restaurant_id', restaurant['id'])
+        .inFilter('status', ['confirmed', 'preparing'])
+        .order('created_at', ascending: true);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // ============================================
+  // LIVREUR - BADGES ET STATS
+  // ============================================
+
+  static Future<List<Map<String, dynamic>>> getLivreurBadges() async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return [];
+    
+    final response = await client.from('livreur_badges')
+        .select().eq('livreur_id', livreur['id']).order('earned_at', ascending: false);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<Map<String, dynamic>> getLivreurDetailedStats() async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return {};
+    
+    return {
+      'total_deliveries': livreur['total_deliveries'] ?? 0,
+      'total_earnings': livreur['total_earnings'] ?? 0,
+      'rating': livreur['rating'] ?? 5.0,
+      'avg_delivery_time': livreur['avg_delivery_time'] ?? 0,
+      'total_distance_km': livreur['total_distance_km'] ?? 0,
+      'acceptance_rate': livreur['acceptance_rate'] ?? 100,
+    };
+  }
+
+  static Future<List<Map<String, dynamic>>> getLivreurDeliveryHistory() async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return [];
+    
+    final response = await client.from('orders')
+        .select('*, restaurant:restaurants(name, address), livreur_commission')
+        .eq('livreur_id', livreur['id'])
+        .eq('status', 'delivered')
+        .order('delivered_at', ascending: false)
+        .limit(50);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // ============================================
+  // UPLOAD IMAGES (Menu, Restaurant)
+  // ============================================
+
+  static Future<String?> uploadMenuItemImage(String itemId, Uint8List bytes) async {
+    final path = 'menu_items/$itemId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+    return await uploadImage('menu-images', path, bytes);
+  }
+
+  static Future<String?> uploadRestaurantLogo(Uint8List bytes) async {
+    final restaurant = await getMyRestaurant();
+    if (restaurant == null) return null;
+    final path = 'restaurants/${restaurant['id']}/logo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final url = await uploadImage('restaurant-images', path, bytes);
+    if (url != null) {
+      await updateRestaurant({'logo_url': url});
+    }
+    return url;
+  }
+
+  static Future<String?> uploadRestaurantCover(Uint8List bytes) async {
+    final restaurant = await getMyRestaurant();
+    if (restaurant == null) return null;
+    final path = 'restaurants/${restaurant['id']}/cover_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final url = await uploadImage('restaurant-images', path, bytes);
+    if (url != null) {
+      await updateRestaurant({'cover_url': url});
+    }
+    return url;
+  }
 }

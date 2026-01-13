@@ -109,6 +109,29 @@ class _RestaurantHomeScreenState extends State<RestaurantHomeScreen> {
                         Expanded(child: _buildStatCard('Total', '${_stats['total_orders'] ?? 0}', 'commandes', Icons.history, Colors.purple)),
                       ],
                     ),
+                    const SizedBox(height: 16),
+                    // Quick actions
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildQuickAction(
+                            icon: Icons.restaurant_menu,
+                            label: 'Cuisine',
+                            color: Colors.orange,
+                            onTap: () => Navigator.pushNamed(context, AppRouter.kitchen),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildQuickAction(
+                            icon: Icons.local_offer,
+                            label: 'Promos',
+                            color: Colors.pink,
+                            onTap: () => Navigator.pushNamed(context, AppRouter.promotions),
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 24),
                     const Text('Commandes en cours', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
@@ -279,5 +302,32 @@ class _RestaurantHomeScreenState extends State<RestaurantHomeScreen> {
       case 'ready': return {'text': 'Prête', 'color': Colors.green};
       default: return {'text': status ?? '', 'color': Colors.grey};
     }
+  }
+
+  Widget _buildQuickAction({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 8),
+            Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
   }
 }

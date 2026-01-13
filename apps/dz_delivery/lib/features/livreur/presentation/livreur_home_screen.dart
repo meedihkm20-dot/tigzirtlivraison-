@@ -76,7 +76,8 @@ class _LivreurHomeScreenState extends State<LivreurHomeScreen> {
   void _onNavTap(int index) {
     setState(() => _currentIndex = index);
     if (index == 1) Navigator.pushNamed(context, AppRouter.earnings);
-    if (index == 2) Navigator.pushNamed(context, AppRouter.livreurProfile);
+    if (index == 2) Navigator.pushNamed(context, AppRouter.badges);
+    if (index == 3) Navigator.pushNamed(context, AppRouter.livreurProfile);
   }
 
   @override
@@ -96,10 +97,12 @@ class _LivreurHomeScreenState extends State<LivreurHomeScreen> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
+        type: BottomNavigationBarType.fixed,
         onTap: _onNavTap,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),
           BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Gains'),
+          BottomNavigationBarItem(icon: Icon(Icons.emoji_events), label: 'Badges'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
         ],
       ),
