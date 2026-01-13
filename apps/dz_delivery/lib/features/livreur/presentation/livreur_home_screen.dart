@@ -17,6 +17,7 @@ class _LivreurHomeScreenState extends State<LivreurHomeScreen> {
   List<Map<String, dynamic>> _activeOrders = [];
   bool _isLoading = false;
   Map<String, dynamic>? _livreurProfile;
+  Map<String, dynamic>? _tierInfo;
 
   @override
   void initState() {
@@ -26,9 +27,11 @@ class _LivreurHomeScreenState extends State<LivreurHomeScreen> {
 
   Future<void> _loadProfile() async {
     final profile = await SupabaseService.getLivreurProfile();
+    final tierInfo = await SupabaseService.getLivreurTierInfo();
     if (profile != null) {
       setState(() {
         _livreurProfile = profile;
+        _tierInfo = tierInfo;
         _isOnline = profile['is_online'] ?? false;
       });
       if (_isOnline) _loadOrders();
@@ -76,18 +79,58 @@ class _LivreurHomeScreenState extends State<LivreurHomeScreen> {
   void _onNavTap(int index) {
     setState(() => _currentIndex = index);
     if (index == 1) Navigator.pushNamed(context, AppRouter.earnings);
-    if (index == 2) Navigator.pushNamed(context, AppRouter.badges);
+    if (index == 2) Navigator.pushNamed(context, AppRouter.tierProgress);
     if (index == 3) Navigator.pushNamed(context, AppRouter.livreurProfile);
+  }
+
+  String _getTierEmoji(String? tier) {
+    switch (tier) {
+      case 'diamond': return '💎';
+      case 'gold': return '🥇';
+      case 'silver': return '🥈';
+      default: return '🥉';
+    }
+  }
+
+  Color _getTierColor(String? tier) {
+    switch (tier) {
+      case 'diamond': return Colors.cyan;
+      case 'gold': return Colors.amber;
+      case 'silver': return Colors.grey;
+      default: return Colors.brown;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentTier = _tierInfo?['current_tier'] ?? 'bronze';
+    final commissionRate = (_tierInfo?['commission_rate'] as num?)?.toDouble() ?? 10.0;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('DZ Delivery Livreur'),
         actions: [
+          // Tier badge
+          GestureDetector(
+            onTap: () => Navigator.pushNamed(context, AppRouter.tierProgress),
+            child: Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _getTierColor(currentTier).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_getTierEmoji(currentTier), style: const TextStyle(fontSize: 16)),
+                  const SizedBox(width: 4),
+                  Text('${commissionRate.toStringAsFixed(0)}%', style: TextStyle(fontWeight: FontWeight.bold, color: _getTierColor(currentTier))),
+                ],
+              ),
+            ),
+          ),
           Switch(value: _isOnline, onChanged: _toggleOnline, activeColor: Colors.green),
-          Text(_isOnline ? 'En ligne' : 'Hors ligne', style: TextStyle(color: _isOnline ? Colors.green : Colors.grey)),
           const SizedBox(width: 8),
         ],
       ),
@@ -102,7 +145,7 @@ class _LivreurHomeScreenState extends State<LivreurHomeScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),
           BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Gains'),
-          BottomNavigationBarItem(icon: Icon(Icons.emoji_events), label: 'Badges'),
+          BottomNavigationBarItem(icon: Icon(Icons.trending_up), label: 'Niveau'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
         ],
       ),

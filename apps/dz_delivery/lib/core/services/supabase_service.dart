@@ -838,4 +838,294 @@ class SupabaseService {
     }
     return url;
   }
+
+  // ============================================
+  // TOP RESTAURANTS & MENUS (CLIENT)
+  // ============================================
+
+  static Future<List<Map<String, dynamic>>> getTopRestaurants({int limit = 10}) async {
+    final response = await client.rpc('get_top_restaurants', params: {'p_limit': limit});
+    return List<Map<String, dynamic>>.from(response ?? []);
+  }
+
+  static Future<List<Map<String, dynamic>>> getTopMenuItems({String? restaurantId, int limit = 20}) async {
+    final response = await client.rpc('get_top_menu_items', params: {
+      'p_restaurant_id': restaurantId,
+      'p_limit': limit,
+    });
+    return List<Map<String, dynamic>>.from(response ?? []);
+  }
+
+  static Future<List<Map<String, dynamic>>> getDailySpecials() async {
+    final response = await client.from('menu_items')
+        .select('*, restaurant:restaurants(id, name, logo_url)')
+        .eq('is_daily_special', true)
+        .eq('is_available', true)
+        .order('avg_rating', ascending: false);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // ============================================
+  // ADRESSES SAUVEGARDÉES (CLIENT)
+  // ============================================
+
+  static Future<List<Map<String, dynamic>>> getSavedAddresses() async {
+    if (currentUser == null) return [];
+    final response = await client.from('saved_addresses')
+        .select()
+        .eq('customer_id', currentUser!.id)
+        .order('is_default', ascending: false);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<void> addSavedAddress({
+    required String label,
+    required String address,
+    required double latitude,
+    required double longitude,
+    String? instructions,
+    bool isDefault = false,
+  }) async {
+    if (currentUser == null) return;
+    
+    if (isDefault) {
+      await client.from('saved_addresses')
+          .update({'is_default': false})
+          .eq('customer_id', currentUser!.id);
+    }
+    
+    await client.from('saved_addresses').insert({
+      'customer_id': currentUser!.id,
+      'label': label,
+      'address': address,
+      'latitude': latitude,
+      'longitude': longitude,
+      'instructions': instructions,
+      'is_default': isDefault,
+    });
+  }
+
+  static Future<void> deleteSavedAddress(String addressId) async {
+    await client.from('saved_addresses').delete().eq('id', addressId);
+  }
+
+  // ============================================
+  // SYSTÈME LIVREUR GAMIFIÉ
+  // ============================================
+
+  static Future<Map<String, dynamic>?> getLivreurTierInfo() async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return null;
+    
+    final tierConfig = await client.from('tier_config')
+        .select()
+        .eq('tier', livreur['tier'] ?? 'bronze')
+        .single();
+    
+    return {
+      'current_tier': livreur['tier'] ?? 'bronze',
+      'commission_rate': tierConfig['commission_rate'],
+      'total_deliveries': livreur['total_deliveries'] ?? 0,
+      'rating': livreur['rating'] ?? 5.0,
+      'cancellation_rate': livreur['cancellation_rate'] ?? 0,
+      'weekly_deliveries': livreur['weekly_deliveries'] ?? 0,
+      'monthly_deliveries': livreur['monthly_deliveries'] ?? 0,
+      'streak_days': livreur['streak_days'] ?? 0,
+      'bonus_earned': livreur['bonus_earned'] ?? 0,
+      'next_tier': _getNextTier(livreur['tier'] ?? 'bronze'),
+      'tier_config': tierConfig,
+    };
+  }
+
+  static String? _getNextTier(String currentTier) {
+    switch (currentTier) {
+      case 'bronze': return 'silver';
+      case 'silver': return 'gold';
+      case 'gold': return 'diamond';
+      default: return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> getNextTierRequirements() async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return null;
+    
+    final nextTier = _getNextTier(livreur['tier'] ?? 'bronze');
+    if (nextTier == null) return null;
+    
+    final config = await client.from('tier_config')
+        .select()
+        .eq('tier', nextTier)
+        .single();
+    
+    return {
+      'tier': nextTier,
+      'min_deliveries': config['min_deliveries'],
+      'min_rating': config['min_rating'],
+      'max_cancellation_rate': config['max_cancellation_rate'],
+      'commission_rate': config['commission_rate'],
+      'current_deliveries': livreur['total_deliveries'] ?? 0,
+      'current_rating': livreur['rating'] ?? 5.0,
+      'current_cancellation_rate': livreur['cancellation_rate'] ?? 0,
+    };
+  }
+
+  static Future<List<Map<String, dynamic>>> getLivreurBonusHistory({int limit = 50}) async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return [];
+    
+    final response = await client.from('livreur_bonuses')
+        .select()
+        .eq('livreur_id', livreur['id'])
+        .order('earned_at', ascending: false)
+        .limit(limit);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getDailyTargets() async {
+    final response = await client.from('livreur_targets')
+        .select()
+        .eq('is_active', true)
+        .order('deliveries_required');
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // ============================================
+  // MENU AMÉLIORÉ (RESTAURANT)
+  // ============================================
+
+  static Future<void> setDailySpecial(String itemId, {double? specialPrice}) async {
+    await client.from('menu_items').update({
+      'is_daily_special': true,
+      'daily_special_price': specialPrice,
+    }).eq('id', itemId);
+  }
+
+  static Future<void> removeDailySpecial(String itemId) async {
+    await client.from('menu_items').update({
+      'is_daily_special': false,
+      'daily_special_price': null,
+    }).eq('id', itemId);
+  }
+
+  static Future<void> updateMenuItemDetails({
+    required String itemId,
+    List<String>? ingredients,
+    Map<String, dynamic>? nutritionInfo,
+    List<String>? tags,
+  }) async {
+    final updates = <String, dynamic>{};
+    if (ingredients != null) updates['ingredients'] = ingredients;
+    if (nutritionInfo != null) updates['nutrition_info'] = nutritionInfo;
+    if (tags != null) updates['tags'] = tags;
+    
+    if (updates.isNotEmpty) {
+      await client.from('menu_items').update(updates).eq('id', itemId);
+    }
+  }
+
+  static Future<Map<String, dynamic>> getMenuItemStats(String itemId) async {
+    final item = await client.from('menu_items')
+        .select('order_count, avg_rating, total_reviews, last_ordered_at')
+        .eq('id', itemId)
+        .single();
+    return item;
+  }
+
+  // ============================================
+  // AVIS SUR LES PLATS
+  // ============================================
+
+  static Future<void> submitMenuItemReview({
+    required String orderId,
+    required String menuItemId,
+    required int rating,
+    String? comment,
+  }) async {
+    if (currentUser == null) return;
+    
+    await client.from('menu_item_reviews').upsert({
+      'menu_item_id': menuItemId,
+      'customer_id': currentUser!.id,
+      'order_id': orderId,
+      'rating': rating,
+      'comment': comment,
+    }, onConflict: 'order_id,menu_item_id');
+    
+    // Mettre à jour la moyenne
+    final reviews = await client.from('menu_item_reviews')
+        .select('rating')
+        .eq('menu_item_id', menuItemId);
+    
+    if (reviews.isNotEmpty) {
+      final avgRating = reviews.map((r) => r['rating'] as int).reduce((a, b) => a + b) / reviews.length;
+      await client.from('menu_items').update({
+        'avg_rating': avgRating,
+        'total_reviews': reviews.length,
+      }).eq('id', menuItemId);
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getMenuItemReviews(String menuItemId) async {
+    final response = await client.from('menu_item_reviews')
+        .select('*, customer:profiles(full_name, avatar_url)')
+        .eq('menu_item_id', menuItemId)
+        .order('created_at', ascending: false)
+        .limit(20);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // ============================================
+  // POINTS FIDÉLITÉ CLIENT
+  // ============================================
+
+  static Future<Map<String, dynamic>> getCustomerLoyalty() async {
+    if (currentUser == null) return {'points': 0, 'total_orders': 0, 'total_spent': 0};
+    
+    final profile = await client.from('profiles')
+        .select('loyalty_points, total_orders, total_spent')
+        .eq('id', currentUser!.id)
+        .single();
+    
+    return {
+      'points': profile['loyalty_points'] ?? 0,
+      'total_orders': profile['total_orders'] ?? 0,
+      'total_spent': profile['total_spent'] ?? 0,
+      'level': _getLoyaltyLevel(profile['total_orders'] ?? 0),
+    };
+  }
+
+  static String _getLoyaltyLevel(int totalOrders) {
+    if (totalOrders >= 100) return 'Platinum';
+    if (totalOrders >= 50) return 'Gold';
+    if (totalOrders >= 20) return 'Silver';
+    return 'Bronze';
+  }
+
+  // ============================================
+  // HISTORIQUE RECHERCHE
+  // ============================================
+
+  static Future<void> saveSearchQuery(String query) async {
+    if (currentUser == null || query.trim().isEmpty) return;
+    await client.from('search_history').insert({
+      'customer_id': currentUser!.id,
+      'query': query.trim(),
+    });
+  }
+
+  static Future<List<String>> getRecentSearches({int limit = 10}) async {
+    if (currentUser == null) return [];
+    final response = await client.from('search_history')
+        .select('query')
+        .eq('customer_id', currentUser!.id)
+        .order('searched_at', ascending: false)
+        .limit(limit);
+    return (response as List).map((r) => r['query'] as String).toSet().toList();
+  }
+
+  static Future<void> clearSearchHistory() async {
+    if (currentUser == null) return;
+    await client.from('search_history').delete().eq('customer_id', currentUser!.id);
+  }
 }

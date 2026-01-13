@@ -12,6 +12,9 @@ import '../../features/customer/presentation/orders_screen.dart';
 import '../../features/customer/presentation/order_tracking_screen.dart';
 import '../../features/customer/presentation/customer_profile_screen.dart';
 import '../../features/customer/presentation/review_screen.dart';
+import '../../features/customer/presentation/notifications_screen.dart';
+import '../../features/customer/presentation/favorites_screen.dart';
+import '../../features/customer/presentation/saved_addresses_screen.dart';
 // Restaurant
 import '../../features/restaurant/presentation/restaurant_home_screen.dart';
 import '../../features/restaurant/presentation/menu_screen.dart';
@@ -26,6 +29,7 @@ import '../../features/livreur/presentation/delivery_screen.dart';
 import '../../features/livreur/presentation/earnings_screen.dart';
 import '../../features/livreur/presentation/livreur_profile_screen.dart';
 import '../../features/livreur/presentation/badges_screen.dart';
+import '../../features/livreur/presentation/tier_progress_screen.dart';
 
 class AppRouter {
   // Auth
@@ -58,6 +62,12 @@ class AppRouter {
   static const String earnings = '/livreur/earnings';
   static const String livreurProfile = '/livreur/profile';
   static const String badges = '/livreur/badges';
+  static const String tierProgress = '/livreur/tier-progress';
+  
+  // Customer extras
+  static const String notifications = '/customer/notifications';
+  static const String favorites = '/customer/favorites';
+  static const String savedAddresses = '/customer/addresses';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -113,6 +123,16 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const LivreurProfileScreen());
       case badges:
         return MaterialPageRoute(builder: (_) => const BadgesScreen());
+      case tierProgress:
+        return MaterialPageRoute(builder: (_) => const TierProgressScreen());
+      
+      // Customer extras
+      case notifications:
+        return MaterialPageRoute(builder: (_) => const NotificationsScreen());
+      case favorites:
+        return MaterialPageRoute(builder: (_) => const FavoritesScreen());
+      case savedAddresses:
+        return MaterialPageRoute(builder: (_) => const SavedAddressesScreen());
       
       // Customer - Review
       case review:
