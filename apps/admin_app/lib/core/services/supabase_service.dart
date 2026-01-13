@@ -155,7 +155,7 @@ class SupabaseService {
   }
 
   // ============================================
-  // FINANCE & STATISTICS
+  // FINANCE & STATISTICS (avec commissions)
   // ============================================
   
   static Future<Map<String, dynamic>> getDashboardStats() async {
@@ -189,27 +189,32 @@ class SupabaseService {
         .eq('is_verified', false)
         .count(CountOption.exact);
 
-    // Today orders
+    // Today orders avec commissions
     final todayOrders = await client
         .from('orders')
-        .select('id, total')
+        .select('id, total, admin_commission, livreur_commission, restaurant_amount')
         .gte('created_at', startOfDay.toIso8601String());
 
     // Month orders
     final monthOrders = await client
         .from('orders')
-        .select('id, total')
-        .gte('created_at', startOfMonth.toIso8601String());
+        .select('id, total, admin_commission')
+        .gte('created_at', startOfMonth.toIso8601String())
+        .eq('status', 'delivered');
 
     // Calculate totals
     double todayRevenue = 0;
+    double todayCommission = 0;
     for (var order in todayOrders) {
       todayRevenue += (order['total'] ?? 0).toDouble();
+      todayCommission += (order['admin_commission'] ?? 0).toDouble();
     }
 
     double monthRevenue = 0;
+    double monthCommission = 0;
     for (var order in monthOrders) {
       monthRevenue += (order['total'] ?? 0).toDouble();
+      monthCommission += (order['admin_commission'] ?? 0).toDouble();
     }
 
     return {
@@ -219,15 +224,73 @@ class SupabaseService {
       'pending_livreurs': pendingLivreurs.count,
       'today_orders': todayOrders.length,
       'today_revenue': todayRevenue,
+      'today_commission': todayCommission,
       'month_orders': monthOrders.length,
       'month_revenue': monthRevenue,
+      'month_commission': monthCommission,
     };
+  }
+
+  /// Stats admin avec les vraies commissions
+  static Future<Map<String, dynamic>> getAdminStats() async {
+    try {
+      final response = await client.rpc('get_admin_stats');
+      if (response is List && response.isNotEmpty) {
+        return Map<String, dynamic>.from(response.first);
+      }
+    } catch (e) {
+      // Fallback si la fonction n'existe pas encore
+    }
+    return {
+      'total_orders': 0,
+      'total_revenue': 0,
+      'total_admin_commission': 0,
+      'today_orders': 0,
+      'today_commission': 0,
+      'pending_restaurant_payments': 0,
+    };
+  }
+
+  /// Récupérer toutes les transactions
+  static Future<List<Map<String, dynamic>>> getAllTransactions({int limit = 100}) async {
+    try {
+      final response = await client
+          .from('transactions')
+          .select('*, order:orders(order_number)')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Paiements en attente pour les restaurants
+  static Future<List<Map<String, dynamic>>> getPendingRestaurantPayments() async {
+    try {
+      final response = await client
+          .from('transactions')
+          .select('*, order:orders(order_number), restaurant:profiles!recipient_id(full_name)')
+          .eq('type', 'restaurant_payment')
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Marquer un paiement restaurant comme effectué
+  static Future<void> markPaymentCompleted(String transactionId) async {
+    await client.from('transactions').update({
+      'status': 'completed',
+    }).eq('id', transactionId);
   }
 
   static Future<List<Map<String, dynamic>>> getRestaurantTransactions(String restaurantId) async {
     final response = await client
         .from('orders')
-        .select('id, order_number, total, delivery_fee, service_fee, status, created_at')
+        .select('id, order_number, total, delivery_fee, admin_commission, restaurant_amount, status, created_at')
         .eq('restaurant_id', restaurantId)
         .eq('status', 'delivered')
         .order('created_at', ascending: false);
@@ -237,25 +300,25 @@ class SupabaseService {
   static Future<Map<String, dynamic>> getRestaurantFinanceStats(String restaurantId) async {
     final orders = await client
         .from('orders')
-        .select('total, delivery_fee, service_fee, created_at')
+        .select('total, admin_commission, restaurant_amount, created_at')
         .eq('restaurant_id', restaurantId)
         .eq('status', 'delivered');
 
     double totalRevenue = 0;
     double totalCommission = 0;
-    const double commissionRate = 0.10; // 10% commission
+    double netRevenue = 0;
 
     for (var order in orders) {
-      final orderTotal = (order['total'] ?? 0).toDouble();
-      totalRevenue += orderTotal;
-      totalCommission += orderTotal * commissionRate;
+      totalRevenue += (order['total'] ?? 0).toDouble();
+      totalCommission += (order['admin_commission'] ?? 0).toDouble();
+      netRevenue += (order['restaurant_amount'] ?? 0).toDouble();
     }
 
     return {
       'total_orders': orders.length,
       'total_revenue': totalRevenue,
       'total_commission': totalCommission,
-      'net_revenue': totalRevenue - totalCommission,
+      'net_revenue': netRevenue,
     };
   }
 
@@ -280,35 +343,37 @@ class SupabaseService {
 
     final deliveredOrders = await client
         .from('orders')
-        .select('total, delivery_fee, service_fee, restaurant_id, created_at')
+        .select('total, delivery_fee, admin_commission, livreur_commission, restaurant_amount, created_at')
         .eq('status', 'delivered');
 
     double totalRevenue = 0;
-    double totalDeliveryFees = 0;
-    double totalServiceFees = 0;
+    double totalAdminCommission = 0;
+    double totalLivreurCommission = 0;
+    double totalRestaurantAmount = 0;
     double monthRevenue = 0;
-    const double commissionRate = 0.10;
+    double monthCommission = 0;
 
     for (var order in deliveredOrders) {
-      final orderTotal = (order['total'] ?? 0).toDouble();
-      totalRevenue += orderTotal;
-      totalDeliveryFees += (order['delivery_fee'] ?? 0).toDouble();
-      totalServiceFees += (order['service_fee'] ?? 0).toDouble();
+      totalRevenue += (order['total'] ?? 0).toDouble();
+      totalAdminCommission += (order['admin_commission'] ?? 0).toDouble();
+      totalLivreurCommission += (order['livreur_commission'] ?? 0).toDouble();
+      totalRestaurantAmount += (order['restaurant_amount'] ?? 0).toDouble();
 
       final createdAt = DateTime.parse(order['created_at']);
       if (createdAt.isAfter(startOfMonth)) {
-        monthRevenue += orderTotal;
+        monthRevenue += (order['total'] ?? 0).toDouble();
+        monthCommission += (order['admin_commission'] ?? 0).toDouble();
       }
     }
 
     return {
       'total_orders': deliveredOrders.length,
       'total_revenue': totalRevenue,
-      'total_delivery_fees': totalDeliveryFees,
-      'total_service_fees': totalServiceFees,
-      'total_commission': totalRevenue * commissionRate,
+      'total_admin_commission': totalAdminCommission,
+      'total_livreur_commission': totalLivreurCommission,
+      'total_restaurant_amount': totalRestaurantAmount,
       'month_revenue': monthRevenue,
-      'month_commission': monthRevenue * commissionRate,
+      'month_commission': monthCommission,
     };
   }
 }

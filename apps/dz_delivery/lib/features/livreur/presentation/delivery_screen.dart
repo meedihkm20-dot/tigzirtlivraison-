@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:location/location.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/routing_service.dart';
@@ -26,6 +26,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   NavigationTracker? _tracker;
   int _currentStepIndex = 0;
   bool _isNavigating = false;
+  final _codeController = TextEditingController();
+  bool _isVerifying = false;
 
   @override
   void initState() {
@@ -59,8 +61,6 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             currentStepIndex: _currentStepIndex,
           );
         }
-        
-        // Mettre à jour la position du livreur dans Supabase
         _updateLivreurPosition(newPosition);
       }
     });
@@ -69,9 +69,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   Future<void> _updateLivreurPosition(LatLng position) async {
     try {
       await SupabaseService.updateLivreurLocation(position.latitude, position.longitude);
-    } catch (e) {
-      // Ignorer les erreurs silencieusement
-    }
+    } catch (e) {}
   }
 
   Future<void> _loadOrder() async {
@@ -81,6 +79,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         _order = order;
         _isLoading = false;
       });
+      _calculateRoute();
     } catch (e) {
       setState(() => _isLoading = false);
     }
@@ -92,14 +91,12 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     final status = _order!['status'] as String?;
     LatLng destination;
     
-    if (status == 'delivering') {
-      // Vers le client
+    if (status == 'delivering' || status == 'picked_up') {
       destination = LatLng(
         (_order!['delivery_latitude'] as num?)?.toDouble() ?? 36.7538,
         (_order!['delivery_longitude'] as num?)?.toDouble() ?? 3.0588,
       );
     } else {
-      // Vers le restaurant
       destination = LatLng(
         (_order!['restaurant']?['latitude'] as num?)?.toDouble() ?? 36.7538,
         (_order!['restaurant']?['longitude'] as num?)?.toDouble() ?? 3.0588,
@@ -113,27 +110,19 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         _tracker = NavigationTracker(
           route: route,
           destination: destination,
-          onRerouteNeeded: _onRerouteNeeded,
-          onStepChanged: _onStepChanged,
-          onArrival: _onArrival,
+          onRerouteNeeded: () {
+            VoiceNavigationService.announceRerouting();
+            _calculateRoute();
+          },
+          onStepChanged: (i) => setState(() => _currentStepIndex = i),
+          onArrival: () {
+            final s = _order!['status'] as String?;
+            VoiceNavigationService.announceArrival(s == 'delivering' ? 'client' : 'restaurant');
+            setState(() => _isNavigating = false);
+          },
         );
       });
     }
-  }
-
-  void _onRerouteNeeded() {
-    VoiceNavigationService.announceRerouting();
-    _calculateRoute();
-  }
-
-  void _onStepChanged(int newIndex) {
-    setState(() => _currentStepIndex = newIndex);
-  }
-
-  void _onArrival() {
-    final status = _order!['status'] as String?;
-    VoiceNavigationService.announceArrival(status == 'delivering' ? 'client' : 'restaurant');
-    setState(() => _isNavigating = false);
   }
 
   Future<void> _startNavigation() async {
@@ -144,35 +133,165 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     VoiceNavigationService.speak('Navigation démarrée');
   }
 
-  Future<void> _startDelivery() async {
-    await SupabaseService.updateOrderStatus(widget.orderId, 'delivering');
+  Future<void> _pickupOrder() async {
+    await SupabaseService.updateOrderStatus(widget.orderId, 'picked_up');
     await _loadOrder();
-    await _calculateRoute();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Livraison démarrée'), backgroundColor: Colors.blue),
+      const SnackBar(content: Text('Commande récupérée! En route vers le client'), backgroundColor: Colors.blue),
     );
   }
 
-  Future<void> _completeDelivery() async {
-    await SupabaseService.updateOrderStatus(widget.orderId, 'delivered');
-    VoiceNavigationService.speak('Livraison terminée. Félicitations!');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Livraison terminée!'), backgroundColor: Colors.green),
+  Future<void> _startDelivering() async {
+    await SupabaseService.updateOrderStatus(widget.orderId, 'delivering');
+    await _loadOrder();
+  }
+
+  /// Afficher le dialog pour entrer le code de confirmation
+  void _showCodeDialog() {
+    _codeController.clear();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Code de confirmation'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Demandez le code à 4 chiffres au client'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _codeController,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 8),
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                counterText: '',
+                border: OutlineInputBorder(),
+                hintText: '0000',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: _isVerifying ? null : _verifyCode,
+            child: _isVerifying 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Vérifier'),
+          ),
+        ],
+      ),
     );
-    Navigator.pushReplacementNamed(context, AppRouter.livreurHome);
+  }
+
+  Future<void> _verifyCode() async {
+    if (_codeController.text.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Entrez un code à 4 chiffres'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    setState(() => _isVerifying = true);
+    
+    try {
+      final success = await SupabaseService.verifyConfirmationCode(
+        widget.orderId,
+        _codeController.text,
+      );
+
+      if (success) {
+        Navigator.pop(context); // Fermer le dialog
+        VoiceNavigationService.speak('Code correct! Livraison terminée. Félicitations!');
+        
+        // Afficher la commission gagnée
+        final commission = (_order!['livreur_commission'] as num?)?.toDouble() ?? 0;
+        
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 32),
+                SizedBox(width: 8),
+                Text('Livraison terminée!'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Vous avez gagné:'),
+                const SizedBox(height: 8),
+                Text(
+                  '${commission.toStringAsFixed(0)} DA',
+                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.green),
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pushReplacementNamed(context, AppRouter.livreurHome);
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                child: const Text('Retour à l\'accueil'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Code incorrect! Réessayez'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() => _isVerifying = false);
+    }
+  }
+
+  String _getStatusText(String? status) {
+    switch (status) {
+      case 'confirmed': return 'En attente de préparation';
+      case 'preparing': return 'Restaurant prépare';
+      case 'ready': return 'Prêt à récupérer';
+      case 'picked_up': return 'En route vers le client';
+      case 'delivering': return 'Livraison en cours';
+      default: return 'En cours';
+    }
+  }
+
+  Color _getStatusColor(String? status) {
+    switch (status) {
+      case 'confirmed':
+      case 'preparing': return Colors.orange;
+      case 'ready': return Colors.green;
+      case 'picked_up':
+      case 'delivering': return Colors.blue;
+      default: return Colors.grey;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    if (_order == null) {
-      return Scaffold(appBar: AppBar(), body: const Center(child: Text('Commande non trouvée')));
-    }
+    if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_order == null) return Scaffold(appBar: AppBar(), body: const Center(child: Text('Commande non trouvée')));
 
     final status = _order!['status'] as String?;
-    final isDelivering = status == 'delivering';
+    final isAtClient = status == 'picked_up' || status == 'delivering';
+    final isReady = status == 'ready';
+    final commission = (_order!['livreur_commission'] as num?)?.toDouble() ?? 0;
 
     return Scaffold(
       body: Stack(
@@ -184,28 +303,19 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               zoom: 16,
               controller: _mapController,
               markers: _buildMarkers(),
-              polylines: _route != null ? [
-                Polyline(
-                  points: _route!.points,
-                  color: Colors.blue,
-                  strokeWidth: 5,
-                ),
-              ] : null,
+              polylines: _route != null ? [Polyline(points: _route!.points, color: Colors.blue, strokeWidth: 5)] : null,
             )
           else
             const Center(child: CircularProgressIndicator()),
           
           // Header
           Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
+            top: 0, left: 0, right: 0,
             child: Container(
               padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
                   colors: [Colors.black.withOpacity(0.7), Colors.transparent],
                 ),
               ),
@@ -213,52 +323,27 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'Livraison #${_order!['order_number'] ?? ''}',
-                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    if (!_isNavigating)
-                      IconButton(
-                        icon: const Icon(Icons.navigation, color: Colors.white),
-                        onPressed: _startNavigation,
-                      ),
+                    IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white), onPressed: () => Navigator.pop(context)),
+                    Expanded(child: Text('Commande #${_order!['order_number'] ?? ''}', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
+                    if (!_isNavigating) IconButton(icon: const Icon(Icons.navigation, color: Colors.white), onPressed: _startNavigation),
                   ],
                 ),
               ),
             ),
           ),
           
-          // Instructions de navigation
+          // Instructions navigation
           if (_isNavigating && _route != null && _route!.steps.isNotEmpty)
             Positioned(
-              top: MediaQuery.of(context).padding.top + 70,
-              left: 16,
-              right: 16,
+              top: MediaQuery.of(context).padding.top + 70, left: 16, right: 16,
               child: Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10)],
-                ),
+                decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(16)),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _route!.steps[_currentStepIndex].instruction,
-                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${_route!.steps[_currentStepIndex].formattedDistance} - ${_route!.formattedDuration} restant',
-                      style: TextStyle(color: Colors.white.withOpacity(0.8)),
-                    ),
+                    Text(_route!.steps[_currentStepIndex].instruction, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text('${_route!.steps[_currentStepIndex].formattedDistance} - ${_route!.formattedDuration}', style: TextStyle(color: Colors.white.withOpacity(0.8))),
                   ],
                 ),
               ),
@@ -266,15 +351,13 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           
           // Bottom panel
           Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
+            bottom: 0, left: 0, right: 0,
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -5))],
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)],
               ),
               child: SafeArea(
                 child: Column(
@@ -283,94 +366,79 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                     // Status
                     Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isDelivering ? Colors.blue.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      decoration: BoxDecoration(color: _getStatusColor(status).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
                       child: Row(
                         children: [
-                          Icon(
-                            isDelivering ? Icons.delivery_dining : Icons.restaurant,
-                            color: isDelivering ? Colors.blue : Colors.orange,
-                          ),
+                          Icon(isAtClient ? Icons.delivery_dining : Icons.restaurant, color: _getStatusColor(status)),
                           const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              isDelivering ? 'En route vers le client' : 'Récupérer au restaurant',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          if (_route != null)
-                            Text(
-                              _route!.formattedDistance,
-                              style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold),
-                            ),
+                          Expanded(child: Text(_getStatusText(status), style: const TextStyle(fontWeight: FontWeight.bold))),
+                          if (_route != null) Text(_route!.formattedDistance, style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
                     const SizedBox(height: 12),
-                    // Destination info
+                    
+                    // Destination
                     Row(
                       children: [
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                isDelivering 
-                                    ? (_order!['customer']?['full_name'] ?? 'Client')
-                                    : (_order!['restaurant']?['name'] ?? 'Restaurant'),
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
-                              Text(
-                                isDelivering 
-                                    ? (_order!['delivery_address'] ?? '')
-                                    : (_order!['restaurant']?['address'] ?? ''),
-                                style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              Text(isAtClient ? (_order!['customer']?['full_name'] ?? 'Client') : (_order!['restaurant']?['name'] ?? 'Restaurant'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              Text(isAtClient ? (_order!['delivery_address'] ?? '') : (_order!['restaurant']?['address'] ?? ''), style: TextStyle(color: Colors.grey[600], fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
                             ],
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.phone, color: Colors.green),
-                          onPressed: () {},
-                        ),
+                        IconButton(icon: const Icon(Icons.phone, color: Colors.green), onPressed: () {}),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    // Montant
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('À collecter'),
-                          Text(
-                            '${_order!['total']?.toStringAsFixed(0) ?? 0} DA',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 18),
+                    
+                    // Montants
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                            child: Column(
+                              children: [
+                                const Text('À collecter', style: TextStyle(fontSize: 12)),
+                                Text('${_order!['total']?.toStringAsFixed(0) ?? 0} DA', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 18)),
+                              ],
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                            child: Column(
+                              children: [
+                                const Text('Votre gain', style: TextStyle(fontSize: 12)),
+                                Text('${commission.toStringAsFixed(0)} DA', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue, fontSize: 18)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
+                    
                     // Action button
                     SizedBox(
                       width: double.infinity,
                       height: 54,
                       child: ElevatedButton(
-                        onPressed: isDelivering ? _completeDelivery : _startDelivery,
+                        onPressed: isReady ? _pickupOrder : (isAtClient ? _showCodeDialog : null),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isDelivering ? Colors.green : Colors.blue,
+                          backgroundColor: isReady ? Colors.orange : (isAtClient ? Colors.green : Colors.grey),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                         child: Text(
-                          isDelivering ? 'Livraison terminée' : 'Commande récupérée',
+                          isReady ? 'J\'ai récupéré la commande' : (isAtClient ? 'Entrer le code de confirmation' : 'En attente...'),
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -387,25 +455,15 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   List<Marker> _buildMarkers() {
     final markers = <Marker>[];
+    if (_currentPosition != null) markers.add(MapMarkers.livreur(_currentPosition!));
     
-    // Position actuelle du livreur
-    if (_currentPosition != null) {
-      markers.add(MapMarkers.livreur(_currentPosition!));
-    }
+    final rLat = (_order!['restaurant']?['latitude'] as num?)?.toDouble();
+    final rLng = (_order!['restaurant']?['longitude'] as num?)?.toDouble();
+    if (rLat != null && rLng != null) markers.add(MapMarkers.restaurant(LatLng(rLat, rLng)));
     
-    // Restaurant
-    final restaurantLat = (_order!['restaurant']?['latitude'] as num?)?.toDouble();
-    final restaurantLng = (_order!['restaurant']?['longitude'] as num?)?.toDouble();
-    if (restaurantLat != null && restaurantLng != null) {
-      markers.add(MapMarkers.restaurant(LatLng(restaurantLat, restaurantLng)));
-    }
-    
-    // Client
-    final clientLat = (_order!['delivery_latitude'] as num?)?.toDouble();
-    final clientLng = (_order!['delivery_longitude'] as num?)?.toDouble();
-    if (clientLat != null && clientLng != null) {
-      markers.add(MapMarkers.client(LatLng(clientLat, clientLng)));
-    }
+    final cLat = (_order!['delivery_latitude'] as num?)?.toDouble();
+    final cLng = (_order!['delivery_longitude'] as num?)?.toDouble();
+    if (cLat != null && cLng != null) markers.add(MapMarkers.client(LatLng(cLat, cLng)));
     
     return markers;
   }
@@ -413,6 +471,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   @override
   void dispose() {
     VoiceNavigationService.stop();
+    _codeController.dispose();
     super.dispose();
   }
 }

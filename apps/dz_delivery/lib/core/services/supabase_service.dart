@@ -377,10 +377,15 @@ class SupabaseService {
     });
   }
 
+  // ============================================
+  // NOUVEAU FLUX: Livreur accepte en premier
+  // ============================================
+
+  /// Livreurs voient les nouvelles commandes (status = pending, pas encore de livreur)
   static Future<List<Map<String, dynamic>>> getAvailableOrders() async {
     final response = await client.from('orders')
         .select('*, restaurant:restaurants(*), customer:profiles!customer_id(full_name, phone)')
-        .eq('status', 'ready')
+        .eq('status', 'pending')
         .isFilter('livreur_id', null)
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response);
@@ -392,21 +397,32 @@ class SupabaseService {
     if (livreur == null) return [];
     
     final response = await client.from('orders')
-        .select('*, restaurant:restaurants(*), customer:profiles!customer_id(full_name, phone, address)')
+        .select('*, restaurant:restaurants(*), customer:profiles!customer_id(full_name, phone, address), confirmation_code, livreur_commission')
         .eq('livreur_id', livreur['id'])
-        .inFilter('status', ['picked_up', 'delivering'])
+        .inFilter('status', ['confirmed', 'preparing', 'ready', 'picked_up', 'delivering'])
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response);
   }
 
+  /// Livreur accepte la commande EN PREMIER (avant le restaurant)
   static Future<void> acceptOrder(String orderId) async {
     final livreur = await getLivreurProfile();
     if (livreur == null) return;
     
+    // Vérifier que la commande n'est pas déjà prise
+    final order = await client.from('orders')
+        .select('livreur_id')
+        .eq('id', orderId)
+        .single();
+    
+    if (order['livreur_id'] != null) {
+      throw Exception('Commande déjà acceptée par un autre livreur');
+    }
+    
     await client.from('orders').update({
       'livreur_id': livreur['id'],
-      'status': 'picked_up',
-      'picked_up_at': DateTime.now().toIso8601String(),
+      'livreur_accepted_at': DateTime.now().toIso8601String(),
+      'status': 'confirmed', // Passe à confirmed pour que le restaurant prépare
     }).eq('id', orderId);
     
     await setAvailability(false);
@@ -414,11 +430,33 @@ class SupabaseService {
 
   static Future<void> updateOrderStatus(String orderId, String status) async {
     final updates = <String, dynamic>{'status': status};
-    if (status == 'delivered') {
-      updates['delivered_at'] = DateTime.now().toIso8601String();
+    if (status == 'picked_up') {
+      updates['picked_up_at'] = DateTime.now().toIso8601String();
     }
     await client.from('orders').update(updates).eq('id', orderId);
-    if (status == 'delivered') await setAvailability(true);
+  }
+
+  /// Vérifier le code de confirmation et terminer la livraison
+  static Future<bool> verifyConfirmationCode(String orderId, String code) async {
+    final result = await client.rpc('verify_confirmation_code', params: {
+      'p_order_id': orderId,
+      'p_code': code,
+    });
+    
+    if (result == true) {
+      await setAvailability(true);
+      return true;
+    }
+    return false;
+  }
+
+  /// Récupérer le code de confirmation (pour le client)
+  static Future<String?> getConfirmationCode(String orderId) async {
+    final order = await client.from('orders')
+        .select('confirmation_code')
+        .eq('id', orderId)
+        .single();
+    return order['confirmation_code'] as String?;
   }
 
   static Future<Map<String, dynamic>> getLivreurEarnings() async {
@@ -429,25 +467,40 @@ class SupabaseService {
     final startOfDay = DateTime(now.year, now.month, now.day);
     final startOfWeek = startOfDay.subtract(Duration(days: now.weekday - 1));
     
+    // Utiliser livreur_commission au lieu de delivery_fee
     final allDeliveries = await client.from('orders')
-        .select('delivery_fee, delivered_at')
+        .select('livreur_commission, delivered_at')
         .eq('livreur_id', livreur['id'])
         .eq('status', 'delivered');
     
     double total = 0, today = 0, week = 0;
     for (final order in allDeliveries) {
-      final fee = (order['delivery_fee'] as num).toDouble();
-      total += fee;
-      final deliveredAt = DateTime.parse(order['delivered_at']);
-      if (deliveredAt.isAfter(startOfDay)) today += fee;
-      if (deliveredAt.isAfter(startOfWeek)) week += fee;
+      final commission = (order['livreur_commission'] as num?)?.toDouble() ?? 0;
+      total += commission;
+      if (order['delivered_at'] != null) {
+        final deliveredAt = DateTime.parse(order['delivered_at']);
+        if (deliveredAt.isAfter(startOfDay)) today += commission;
+        if (deliveredAt.isAfter(startOfWeek)) week += commission;
+      }
     }
     
     return {'total': total, 'today': today, 'week': week, 'deliveries': allDeliveries.length};
   }
 
+  /// Récupérer les transactions du livreur
+  static Future<List<Map<String, dynamic>>> getLivreurTransactions() async {
+    if (currentUser == null) return [];
+    final response = await client.from('transactions')
+        .select('*, order:orders(order_number)')
+        .eq('recipient_id', currentUser!.id)
+        .eq('type', 'livreur_earning')
+        .order('created_at', ascending: false)
+        .limit(50);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
   // ============================================
-  // REALTIME
+  // REALTIME - NOUVEAU FLUX
   // ============================================
   
   static RealtimeChannel subscribeToOrder(String orderId, void Function(Map<String, dynamic>) onUpdate) {
@@ -461,26 +514,33 @@ class SupabaseService {
         ).subscribe();
   }
 
+  /// Restaurant écoute les commandes confirmées par un livreur
   static RealtimeChannel subscribeToNewRestaurantOrders(String restaurantId, void Function(Map<String, dynamic>) onNewOrder) {
     return client.channel('restaurant_orders_$restaurantId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'orders',
-          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'restaurant_id', value: restaurantId),
-          callback: (payload) => onNewOrder(payload.newRecord),
-        ).subscribe();
-  }
-
-  static RealtimeChannel subscribeToAvailableOrders(void Function(Map<String, dynamic>) onNewOrder) {
-    return client.channel('available_orders')
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
           schema: 'public',
           table: 'orders',
-          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'status', value: 'ready'),
+          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'restaurant_id', value: restaurantId),
           callback: (payload) {
-            if (payload.newRecord['livreur_id'] == null) onNewOrder(payload.newRecord);
+            // Notifier quand un livreur accepte (status = confirmed)
+            if (payload.newRecord['status'] == 'confirmed' && payload.newRecord['livreur_id'] != null) {
+              onNewOrder(payload.newRecord);
+            }
+          },
+        ).subscribe();
+  }
+
+  /// Livreurs écoutent les NOUVELLES commandes (status = pending)
+  static RealtimeChannel subscribeToNewOrders(void Function(Map<String, dynamic>) onNewOrder) {
+    return client.channel('new_orders_for_livreurs')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'orders',
+          callback: (payload) {
+            // Nouvelle commande créée
+            onNewOrder(payload.newRecord);
           },
         ).subscribe();
   }
