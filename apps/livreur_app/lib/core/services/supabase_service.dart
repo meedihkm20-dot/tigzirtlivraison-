@@ -4,9 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class SupabaseService {
   static SupabaseClient get client => Supabase.instance.client;
   
-  // TODO: Remplacer par vos vraies clés Supabase
-  static const String supabaseUrl = 'https://YOUR_PROJECT_ID.supabase.co';
-  static const String supabaseAnonKey = 'YOUR_ANON_KEY';
+  static const String supabaseUrl = 'https://pauqmhqriyjdqctvfvtt.supabase.co';
+  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdXFtaHFyaXlqZHFjdHZmdnR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTgxNzksImV4cCI6MjA4MzgzNDE3OX0.ZdhrCmf465g2-dHf1DUMJ5GlR9t-kZnPvo7uvvoA0x8';
 
   /// Initialise Supabase
   static Future<void> init() async {
