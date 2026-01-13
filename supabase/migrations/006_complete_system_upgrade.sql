@@ -5,8 +5,13 @@
 -- 1. SYSTÈME LIVREUR GAMIFIÉ (Commission ~12.5%)
 -- ============================================
 
--- Niveaux livreur
-CREATE TYPE livreur_tier AS ENUM ('bronze', 'silver', 'gold', 'diamond');
+-- Niveaux livreur (créer seulement si n'existe pas)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'livreur_tier') THEN
+        CREATE TYPE livreur_tier AS ENUM ('bronze', 'silver', 'gold', 'diamond');
+    END IF;
+END$$;
 
 ALTER TABLE public.livreurs ADD COLUMN IF NOT EXISTS tier livreur_tier DEFAULT 'bronze';
 ALTER TABLE public.livreurs ADD COLUMN IF NOT EXISTS tier_progress INTEGER DEFAULT 0; -- Points vers prochain niveau
@@ -96,17 +101,14 @@ CREATE TABLE IF NOT EXISTS public.menu_item_reviews (
 -- 3. NOTIFICATIONS FIREBASE
 -- ============================================
 
-CREATE TABLE IF NOT EXISTS public.notifications (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-    title VARCHAR(100) NOT NULL,
-    body TEXT NOT NULL,
-    data JSONB, -- Données additionnelles (order_id, type, etc.)
-    notification_type VARCHAR(50) NOT NULL, -- 'order_status', 'new_order', 'promotion', 'system'
-    is_read BOOLEAN DEFAULT false,
-    sent_at TIMESTAMPTZ DEFAULT NOW(),
-    read_at TIMESTAMPTZ
-);
+-- Ajouter les colonnes manquantes à la table notifications existante
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS notification_type VARCHAR(50) DEFAULT 'system';
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ;
+
+-- Renommer body si nécessaire (la table originale a 'body' déjà)
+-- Mettre à jour les anciennes notifications sans type
+UPDATE public.notifications SET notification_type = 'system' WHERE notification_type IS NULL;
 
 -- FCM tokens pour tous les utilisateurs
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS fcm_token TEXT;

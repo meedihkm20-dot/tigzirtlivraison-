@@ -15,6 +15,10 @@ import '../../features/customer/presentation/review_screen.dart';
 import '../../features/customer/presentation/notifications_screen.dart';
 import '../../features/customer/presentation/favorites_screen.dart';
 import '../../features/customer/presentation/saved_addresses_screen.dart';
+import '../../features/customer/presentation/live_tracking_screen.dart';
+import '../../features/customer/presentation/reorder_screen.dart';
+import '../../features/customer/presentation/referral_screen.dart';
+import '../../features/shared/presentation/chat_screen.dart';
 // Restaurant
 import '../../features/restaurant/presentation/restaurant_home_screen.dart';
 import '../../features/restaurant/presentation/menu_screen.dart';
@@ -68,6 +72,10 @@ class AppRouter {
   static const String notifications = '/customer/notifications';
   static const String favorites = '/customer/favorites';
   static const String savedAddresses = '/customer/addresses';
+  static const String liveTracking = '/customer/live-tracking';
+  static const String reorder = '/customer/reorder';
+  static const String referral = '/customer/referral';
+  static const String chat = '/chat';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -133,6 +141,20 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const FavoritesScreen());
       case savedAddresses:
         return MaterialPageRoute(builder: (_) => const SavedAddressesScreen());
+      case liveTracking:
+        final orderId = settings.arguments as String;
+        return MaterialPageRoute(builder: (_) => LiveTrackingScreen(orderId: orderId));
+      case reorder:
+        return MaterialPageRoute(builder: (_) => const ReorderScreen());
+      case referral:
+        return MaterialPageRoute(builder: (_) => const ReferralScreen());
+      case chat:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(builder: (_) => ChatScreen(
+          orderId: args['orderId'],
+          recipientName: args['recipientName'],
+          isLivreur: args['isLivreur'] ?? false,
+        ));
       
       // Customer - Review
       case review:

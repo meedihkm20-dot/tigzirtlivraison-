@@ -1128,4 +1128,113 @@ class SupabaseService {
     if (currentUser == null) return;
     await client.from('search_history').delete().eq('customer_id', currentUser!.id);
   }
+
+  // ============================================
+  // CHAT CLIENT-LIVREUR
+  // ============================================
+
+  static Future<List<Map<String, dynamic>>> getOrderMessages(String orderId) async {
+    final response = await client.from('order_messages')
+        .select('*, sender:profiles!sender_id(full_name)')
+        .eq('order_id', orderId)
+        .order('created_at', ascending: true);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<void> sendOrderMessage({
+    required String orderId,
+    required String message,
+    required String senderType, // 'customer', 'livreur'
+  }) async {
+    if (currentUser == null) return;
+    await client.from('order_messages').insert({
+      'order_id': orderId,
+      'sender_id': currentUser!.id,
+      'message': message,
+      'sender_type': senderType,
+    });
+  }
+
+  // ============================================
+  // POURBOIRE
+  // ============================================
+
+  static Future<bool> addTip(String orderId, double amount) async {
+    try {
+      final result = await client.rpc('add_tip', params: {
+        'p_order_id': orderId,
+        'p_amount': amount,
+      });
+      return result == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // ============================================
+  // PARRAINAGE
+  // ============================================
+
+  static Future<String?> getReferralCode() async {
+    if (currentUser == null) return null;
+    final profile = await client.from('profiles')
+        .select('referral_code')
+        .eq('id', currentUser!.id)
+        .single();
+    return profile['referral_code'] as String?;
+  }
+
+  static Future<Map<String, dynamic>> applyReferralCode(String code) async {
+    try {
+      final result = await client.rpc('apply_referral_code', params: {'p_code': code});
+      if (result is List && result.isNotEmpty) {
+        return Map<String, dynamic>.from(result.first);
+      }
+      return {'success': false, 'message': 'Erreur'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getMyReferrals() async {
+    if (currentUser == null) return [];
+    final response = await client.from('referrals')
+        .select('*, referred:profiles!referred_id(full_name, created_at)')
+        .eq('referrer_id', currentUser!.id)
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<Map<String, dynamic>> getReferralStats() async {
+    if (currentUser == null) return {'total_referrals': 0, 'total_earnings': 0};
+    
+    final profile = await client.from('profiles')
+        .select('referral_earnings')
+        .eq('id', currentUser!.id)
+        .single();
+    
+    final referrals = await client.from('referrals')
+        .select('id')
+        .eq('referrer_id', currentUser!.id)
+        .eq('status', 'rewarded');
+    
+    return {
+      'total_referrals': (referrals as List).length,
+      'total_earnings': profile['referral_earnings'] ?? 0,
+    };
+  }
+
+  // ============================================
+  // SUGGESTIONS RECOMMANDE
+  // ============================================
+
+  static Future<List<Map<String, dynamic>>> getReorderSuggestions() async {
+    if (currentUser == null) return [];
+    final response = await client.from('reorder_suggestions')
+        .select('*, restaurant:restaurants(id, name, logo_url, rating)')
+        .eq('customer_id', currentUser!.id)
+        .order('last_ordered_at', ascending: false)
+        .limit(10);
+    return List<Map<String, dynamic>>.from(response);
+  }
 }
