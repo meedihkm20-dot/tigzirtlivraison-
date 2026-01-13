@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "613654100148",
+    "project_id": "app-liv-tigzirt",
+    "storage_bucket": "app-liv-tigzirt.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:613654100148:android:e9b06e00cac30805b37fe1",
+        "android_client_info": {
+          "package_name": "com.dzdelivery.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCFVl9BE1QPIDN7QmyevXs6_1Yv4mHdjLw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

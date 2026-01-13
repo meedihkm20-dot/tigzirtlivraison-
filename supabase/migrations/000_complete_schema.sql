@@ -64,6 +64,8 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS total_spent DECIMAL(12,2) D
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referral_code VARCHAR(10);
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referred_by UUID REFERENCES public.profiles(id);
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referral_earnings DECIMAL(10,2) DEFAULT 0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT false;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT false;
 
 -- ============================================
 -- TABLE: RESTAURANTS
@@ -807,12 +809,13 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.profiles (id, full_name, phone, role)
+    INSERT INTO public.profiles (id, full_name, phone, role, phone_verified)
     VALUES (
         NEW.id,
         COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
         COALESCE(NEW.raw_user_meta_data->>'phone', ''),
-        COALESCE((NEW.raw_user_meta_data->>'role')::user_role, 'customer')
+        COALESCE((NEW.raw_user_meta_data->>'role')::user_role, 'customer'),
+        COALESCE((NEW.raw_user_meta_data->>'phone_verified')::boolean, false)
     );
     RETURN NEW;
 END;

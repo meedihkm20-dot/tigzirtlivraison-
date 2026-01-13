@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/services/firebase_auth_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
+import 'phone_verification_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -16,6 +18,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   bool _obscurePassword = true;
+  bool _phoneVerified = false;
 
   // Champs communs
   final _emailController = TextEditingController();
@@ -30,8 +33,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Champs livreur
   String _vehicleType = 'moto';
 
+  Future<void> _verifyPhone() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) {
+      setState(() => _errorMessage = 'Entrez votre numéro de téléphone');
+      return;
+    }
+
+    if (!FirebaseAuthService.isValidAlgerianPhone(phone)) {
+      setState(() => _errorMessage = 'Numéro algérien invalide (ex: 0555123456)');
+      return;
+    }
+
+    setState(() => _errorMessage = null);
+
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PhoneVerificationScreen(
+          phoneNumber: phone,
+          onVerified: () => Navigator.pop(context, true),
+        ),
+      ),
+    );
+
+    if (result == true) {
+      setState(() => _phoneVerified = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✓ Numéro vérifié avec succès!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Pour les clients, vérifier que le téléphone est vérifié
+    if (_selectedRole == 'customer' && !_phoneVerified) {
+      setState(() => _errorMessage = 'Veuillez d\'abord vérifier votre numéro de téléphone');
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -46,8 +90,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             password: _passwordController.text,
             fullName: _fullNameController.text.trim(),
             phone: _phoneController.text.trim(),
+            phoneVerified: true, // Téléphone vérifié via Firebase
           );
-          if (mounted) Navigator.pushReplacementNamed(context, AppRouter.customerHome);
+          if (mounted) {
+            // Afficher message de vérification email
+            _showEmailVerificationDialog();
+          }
           break;
 
         case 'restaurant':
@@ -78,6 +126,45 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showEmailVerificationDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.email_outlined, color: AppTheme.primaryColor),
+            SizedBox(width: 12),
+            Text('Vérifiez votre email'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Un email de confirmation a été envoyé à:'),
+            const SizedBox(height: 8),
+            Text(
+              _emailController.text.trim(),
+              style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+            ),
+            const SizedBox(height: 16),
+            const Text('Cliquez sur le lien dans l\'email pour activer votre compte.'),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushReplacementNamed(context, AppRouter.login);
+            },
+            child: const Text('Compris'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -127,15 +214,88 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
-                validator: (v) => v == null || v.isEmpty ? 'Champ requis' : null,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Champ requis';
+                  if (!v.contains('@')) return 'Email invalide';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Téléphone', prefixIcon: Icon(Icons.phone_outlined)),
-                validator: (v) => v == null || v.isEmpty ? 'Champ requis' : null,
+              // Téléphone avec bouton de vérification (pour clients)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      enabled: !_phoneVerified,
+                      decoration: InputDecoration(
+                        labelText: 'Téléphone',
+                        prefixIcon: const Icon(Icons.phone_outlined),
+                        hintText: '0555123456',
+                        suffixIcon: _phoneVerified
+                            ? const Icon(Icons.check_circle, color: Colors.green)
+                            : null,
+                      ),
+                      validator: (v) => v == null || v.isEmpty ? 'Champ requis' : null,
+                      onChanged: (_) {
+                        if (_phoneVerified) {
+                          setState(() => _phoneVerified = false);
+                        }
+                      },
+                    ),
+                  ),
+                  if (_selectedRole == 'customer' && !_phoneVerified) ...[
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: ElevatedButton(
+                        onPressed: _verifyPhone,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.secondaryColor,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        ),
+                        child: const Text('Vérifier'),
+                      ),
+                    ),
+                  ],
+                ],
               ),
+              // Info vérification pour clients
+              if (_selectedRole == 'customer') ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _phoneVerified 
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _phoneVerified ? Icons.verified : Icons.info_outline,
+                        color: _phoneVerified ? Colors.green : Colors.orange,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _phoneVerified
+                              ? 'Numéro vérifié ✓'
+                              : 'Vérification SMS requise pour les clients',
+                          style: TextStyle(
+                            color: _phoneVerified ? Colors.green[700] : Colors.orange[700],
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               TextFormField(
                 controller: _passwordController,
@@ -234,7 +394,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final isSelected = _selectedRole == role;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _selectedRole = role),
+        onTap: () => setState(() {
+          _selectedRole = role;
+          _phoneVerified = false; // Reset phone verification when changing role
+        }),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
