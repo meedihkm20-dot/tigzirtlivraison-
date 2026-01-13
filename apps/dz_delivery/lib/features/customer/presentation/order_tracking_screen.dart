@@ -121,6 +121,43 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               ),
             ),
             const SizedBox(height: 16),
+            // Code de confirmation (affiché quand livreur en route)
+            if (['picked_up', 'delivering'].contains(status))
+              Container(
+                padding: const EdgeInsets.all(20),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.orange, width: 2),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.lock, color: Colors.orange, size: 32),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Code de confirmation',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _order!['confirmation_code'] ?? '----',
+                      style: const TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 8,
+                        color: Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Donnez ce code au livreur à la réception',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
             // Delivery address
             Container(
               padding: const EdgeInsets.all(16),
