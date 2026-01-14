@@ -698,6 +698,38 @@ class SupabaseService {
   }
 
   // ============================================
+  // DELETE OPERATIONS (avec audit)
+  // ============================================
+
+  static Future<void> deleteRestaurant(String restaurantId) async {
+    final restaurant = await client.from('restaurants').select('name').eq('id', restaurantId).single();
+    
+    await client.from('restaurants').delete().eq('id', restaurantId);
+
+    await logAction(
+      action: 'delete_restaurant',
+      entityType: 'restaurant',
+      entityId: restaurantId,
+      oldValue: {'name': restaurant['name']},
+      reason: 'Suppression manuelle',
+    );
+  }
+
+  static Future<void> deleteLivreur(String livreurId) async {
+    final livreur = await client.from('livreurs').select('user:profiles!user_id(full_name)').eq('id', livreurId).single();
+    
+    await client.from('livreurs').delete().eq('id', livreurId);
+
+    await logAction(
+      action: 'delete_livreur',
+      entityType: 'livreur',
+      entityId: livreurId,
+      oldValue: {'name': livreur['user']?['full_name']},
+      reason: 'Suppression manuelle',
+    );
+  }
+
+  // ============================================
   // UTILS
   // ============================================
 
