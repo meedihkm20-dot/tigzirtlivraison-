@@ -37,6 +37,12 @@ class _LoginScreenState extends State<LoginScreen> {
       // Récupérer le rôle et rediriger
       final role = await SupabaseService.getUserRole();
       
+      if (role == null) {
+        setState(() => _errorMessage = 'Profil utilisateur introuvable. Contactez l\'administrateur.');
+        await SupabaseService.signOut();
+        return;
+      }
+      
       switch (role) {
         case 'customer':
           Navigator.pushReplacementNamed(context, AppRouter.customerHome);
@@ -57,8 +63,13 @@ class _LoginScreenState extends State<LoginScreen> {
             Navigator.pushReplacementNamed(context, AppRouter.pendingApproval, arguments: 'livreur');
           }
           break;
+        case 'admin':
+          setState(() => _errorMessage = 'Utilisez l\'application admin pour vous connecter');
+          await SupabaseService.signOut();
+          break;
         default:
-          setState(() => _errorMessage = 'Rôle inconnu');
+          setState(() => _errorMessage = 'Rôle inconnu: $role');
+          await SupabaseService.signOut();
       }
     } catch (e) {
       setState(() => _errorMessage = 'Email ou mot de passe incorrect');

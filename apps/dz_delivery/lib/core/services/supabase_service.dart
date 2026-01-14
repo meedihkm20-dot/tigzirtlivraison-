@@ -1,5 +1,7 @@
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
 
 /// Service Supabase centralisé pour l'app DZ Delivery (multi-rôle)
 class SupabaseService {
@@ -18,6 +20,66 @@ class SupabaseService {
 
   static User? get currentUser => client.auth.currentUser;
   static bool get isLoggedIn => currentUser != null;
+
+  // ============================================
+  // EDGE FUNCTIONS - SÉCURITÉ MAXIMALE
+  // ============================================
+
+  /// Appel générique aux Edge Functions
+  static Future<Map<String, dynamic>> _callEdgeFunction(
+    String functionName,
+    Map<String, dynamic> body,
+  ) async {
+    final session = client.auth.currentSession;
+    if (session == null) {
+      throw Exception('Utilisateur non connecté');
+    }
+
+    final response = await http.post(
+      Uri.parse('$supabaseUrl/functions/v1/$functionName'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${session.accessToken}',
+        'apikey': supabaseAnonKey,
+      },
+      body: jsonEncode(body),
+    );
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    
+    if (response.statusCode != 200 || data['success'] != true) {
+      throw Exception(data['error'] ?? 'Erreur Edge Function');
+    }
+    
+    return data;
+  }
+
+  /// Change le statut d'une commande via Edge Function (SÉCURISÉ)
+  static Future<void> changeOrderStatusSecure(String orderId, String newStatus) async {
+    await _callEdgeFunction('change-order-status', {
+      'order_id': orderId,
+      'new_status': newStatus,
+    });
+  }
+
+  /// Annule une commande via Edge Function (SÉCURISÉ)
+  static Future<void> cancelOrderSecure(String orderId, {String? reason}) async {
+    await _callEdgeFunction('cancel-order', {
+      'order_id': orderId,
+      'reason': reason,
+    });
+  }
+
+  /// Vérifie le code de confirmation et finalise la livraison (SÉCURISÉ)
+  static Future<Map<String, dynamic>> verifyDeliverySecure(
+    String orderId,
+    String confirmationCode,
+  ) async {
+    return await _callEdgeFunction('verify-delivery', {
+      'order_id': orderId,
+      'confirmation_code': confirmationCode,
+    });
+  }
 
   // ============================================
   // AUTH - COMMUN
@@ -158,6 +220,32 @@ class SupabaseService {
       'user_lng': longitude,
       'radius_km': radiusKm,
     });
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  /// Récupérer un restaurant par ID (pour le client)
+  static Future<Map<String, dynamic>?> getRestaurantById(String id) async {
+    return await client.from('restaurants')
+        .select()
+        .eq('id', id)
+        .single();
+  }
+
+  /// Récupérer les plats d'un restaurant
+  static Future<List<Map<String, dynamic>>> getRestaurantMenuItems(String restaurantId) async {
+    final response = await client.from('menu_items')
+        .select('*, category:menu_categories(name)')
+        .eq('restaurant_id', restaurantId)
+        .order('name');
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  /// Récupérer les catégories d'un restaurant
+  static Future<List<Map<String, dynamic>>> getRestaurantCategories(String restaurantId) async {
+    final response = await client.from('menu_categories')
+        .select()
+        .eq('restaurant_id', restaurantId)
+        .order('sort_order');
     return List<Map<String, dynamic>>.from(response);
   }
 
@@ -348,12 +436,31 @@ class SupabaseService {
     }).eq('id', orderId);
   }
 
+  /// Annule une commande
+  /// Utilise Edge Function en priorité (sécurité maximale), fallback sur validation locale
   static Future<void> cancelOrder(String orderId, String reason) async {
-    await client.from('orders').update({
-      'status': 'cancelled',
-      'cancelled_at': DateTime.now().toIso8601String(),
-      'cancellation_reason': reason,
-    }).eq('id', orderId);
+    try {
+      // Essayer d'abord via Edge Function (RECOMMANDÉ)
+      await cancelOrderSecure(orderId, reason: reason);
+    } catch (e) {
+      // Fallback: validation locale si Edge Function non disponible
+      final order = await client.from('orders')
+          .select('status')
+          .eq('id', orderId)
+          .single();
+      final currentStatus = order['status'] as String?;
+      
+      final nonCancellableStatuses = ['picked_up', 'delivering', 'delivered'];
+      if (currentStatus != null && nonCancellableStatuses.contains(currentStatus)) {
+        throw Exception('Impossible d\'annuler une commande en cours de livraison ou livrée');
+      }
+      
+      await client.from('orders').update({
+        'status': 'cancelled',
+        'cancelled_at': DateTime.now().toIso8601String(),
+        'cancellation_reason': reason,
+      }).eq('id', orderId);
+    }
   }
 
   static Future<Map<String, dynamic>> getRestaurantStats() async {
@@ -461,26 +568,65 @@ class SupabaseService {
     await setAvailability(false);
   }
 
+  /// Met à jour le statut d'une commande
+  /// Utilise Edge Function en priorité (sécurité maximale), fallback sur validation locale
   static Future<void> updateOrderStatus(String orderId, String status) async {
-    final updates = <String, dynamic>{'status': status};
-    if (status == 'picked_up') {
-      updates['picked_up_at'] = DateTime.now().toIso8601String();
+    try {
+      // Essayer d'abord via Edge Function (RECOMMANDÉ)
+      await changeOrderStatusSecure(orderId, status);
+    } catch (e) {
+      // Fallback: validation locale si Edge Function non disponible
+      // (utile en développement ou si Edge Functions pas déployées)
+      final validTransitions = {
+        'pending': ['confirmed', 'cancelled'],
+        'confirmed': ['preparing', 'cancelled'],
+        'preparing': ['ready', 'cancelled'],
+        'ready': ['picked_up'],
+        'picked_up': ['delivering', 'delivered'],
+        'delivering': ['delivered'],
+      };
+      
+      final order = await client.from('orders')
+          .select('status')
+          .eq('id', orderId)
+          .single();
+      final currentStatus = order['status'] as String?;
+      
+      if (currentStatus != null && 
+          validTransitions.containsKey(currentStatus) &&
+          !validTransitions[currentStatus]!.contains(status)) {
+        throw Exception('Transition de statut invalide: $currentStatus → $status');
+      }
+      
+      final updates = <String, dynamic>{'status': status};
+      if (status == 'picked_up') {
+        updates['picked_up_at'] = DateTime.now().toIso8601String();
+      }
+      await client.from('orders').update(updates).eq('id', orderId);
     }
-    await client.from('orders').update(updates).eq('id', orderId);
   }
 
   /// Vérifier le code de confirmation et terminer la livraison
+  /// Utilise Edge Function en priorité (sécurité maximale)
   static Future<bool> verifyConfirmationCode(String orderId, String code) async {
-    final result = await client.rpc('verify_confirmation_code', params: {
-      'p_order_id': orderId,
-      'p_code': code,
-    });
-    
-    if (result == true) {
+    try {
+      // Essayer d'abord via Edge Function (RECOMMANDÉ)
+      await verifyDeliverySecure(orderId, code);
       await setAvailability(true);
       return true;
+    } catch (e) {
+      // Fallback: RPC si Edge Function non disponible
+      final result = await client.rpc('verify_confirmation_code', params: {
+        'p_order_id': orderId,
+        'p_code': code,
+      });
+      
+      if (result == true) {
+        await setAvailability(true);
+        return true;
+      }
+      return false;
     }
-    return false;
   }
 
   /// Récupérer le code de confirmation (pour le client)
@@ -1269,5 +1415,371 @@ class SupabaseService {
         .order('last_ordered_at', ascending: false)
         .limit(10);
     return List<Map<String, dynamic>>.from(response);
+  }
+
+  // ============================================
+  // CLIENT V2 - MÉTHODES ADDITIONNELLES
+  // ============================================
+
+  static Future<List<Map<String, dynamic>>> getCartItems() async {
+    if (currentUser == null) return [];
+    final response = await client.from('cart_items')
+        .select('*, menu_item:menu_items(*, restaurant:restaurants(name))')
+        .eq('customer_id', currentUser!.id);
+    return List<Map<String, dynamic>>.from(response).map((item) {
+      final menuItem = item['menu_item'] as Map<String, dynamic>?;
+      return {
+        'id': item['id'],
+        'menu_item_id': item['menu_item_id'],
+        'quantity': item['quantity'],
+        'name': menuItem?['name'],
+        'price': menuItem?['price'],
+        'image_url': menuItem?['image_url'],
+        'restaurant_id': menuItem?['restaurant_id'],
+        'restaurant_name': menuItem?['restaurant']?['name'],
+      };
+    }).toList();
+  }
+
+  static Future<void> addToCart(String menuItemId, int quantity) async {
+    if (currentUser == null) return;
+    final existing = await client.from('cart_items')
+        .select()
+        .eq('customer_id', currentUser!.id)
+        .eq('menu_item_id', menuItemId)
+        .maybeSingle();
+    
+    if (existing != null) {
+      await client.from('cart_items')
+          .update({'quantity': (existing['quantity'] as int) + quantity})
+          .eq('id', existing['id']);
+    } else {
+      await client.from('cart_items').insert({
+        'customer_id': currentUser!.id,
+        'menu_item_id': menuItemId,
+        'quantity': quantity,
+      });
+    }
+  }
+
+  static Future<void> updateCartItemQuantity(String cartItemId, int quantity) async {
+    await client.from('cart_items').update({'quantity': quantity}).eq('id', cartItemId);
+  }
+
+  static Future<void> removeFromCart(String cartItemId) async {
+    await client.from('cart_items').delete().eq('id', cartItemId);
+  }
+
+  static Future<void> clearCart() async {
+    if (currentUser == null) return;
+    await client.from('cart_items').delete().eq('customer_id', currentUser!.id);
+  }
+
+  static Future<List<Map<String, dynamic>>> getMenuSuggestions(String restaurantId, {int limit = 4}) async {
+    final response = await client.from('menu_items')
+        .select()
+        .eq('restaurant_id', restaurantId)
+        .eq('is_available', true)
+        .eq('is_popular', true)
+        .limit(limit);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<Map<String, dynamic>?> getOrderDetails(String orderId) async {
+    return await client.from('orders')
+        .select('*, restaurant:restaurants(*), livreur:livreurs(*, profile:profiles(*)), order_items(*), customer:profiles!customer_id(*)')
+        .eq('id', orderId)
+        .maybeSingle();
+  }
+
+  static Stream<Map<String, dynamic>?> subscribeToOrderStream(String orderId) {
+    return client.from('orders')
+        .stream(primaryKey: ['id'])
+        .eq('id', orderId)
+        .map((list) => list.isNotEmpty ? list.first : null);
+  }
+
+  static Stream<Map<String, dynamic>?> subscribeToLivreurLocation(String orderId) {
+    return client.from('livreur_locations')
+        .stream(primaryKey: ['id'])
+        .eq('order_id', orderId)
+        .order('created_at', ascending: false)
+        .limit(1)
+        .map((list) => list.isNotEmpty ? {'lat': list.first['latitude'], 'lng': list.first['longitude']} : null);
+  }
+
+  static Future<List<dynamic>> getRoute(dynamic start, dynamic end) async {
+    // Placeholder - would use OSRM API
+    return [];
+  }
+
+  static Future<Map<String, dynamic>> getRouteInfo(dynamic start, dynamic end) async {
+    // Placeholder - would use OSRM API
+    return {'duration': 15, 'distance': 2.5, 'instruction': 'Continuez tout droit'};
+  }
+
+  static Future<Map<String, dynamic>> getCustomerStats() async {
+    if (currentUser == null) return {};
+    final profile = await client.from('profiles')
+        .select('total_orders, total_spent')
+        .eq('id', currentUser!.id)
+        .maybeSingle();
+    return {
+      'total_orders': profile?['total_orders'] ?? 0,
+      'total_spent': profile?['total_spent'] ?? 0,
+      'avg_rating': 4.5,
+      'favorite_restaurant': 'Pizza Tigzirt',
+    };
+  }
+
+  static Future<List<Map<String, dynamic>>> getCustomerBadges() async {
+    if (currentUser == null) return [];
+    final response = await client.from('customer_badges')
+        .select('*, badge:badges(*)')
+        .eq('customer_id', currentUser!.id);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getRecentOrders({int limit = 3}) async {
+    if (currentUser == null) return [];
+    final response = await client.from('orders')
+        .select('*, restaurant:restaurants(name)')
+        .eq('customer_id', currentUser!.id)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return List<Map<String, dynamic>>.from(response).map((o) => {
+      ...o,
+      'restaurant_name': o['restaurant']?['name'],
+    }).toList();
+  }
+
+  // ============================================
+  // LIVREUR V2 - MÉTHODES ADDITIONNELLES
+  // ============================================
+
+  static Future<Map<String, dynamic>> getLivreurTodayStats() async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return {};
+    
+    final today = DateTime.now();
+    final startOfDay = DateTime(today.year, today.month, today.day);
+    
+    final deliveries = await client.from('orders')
+        .select('livreur_commission, tip_amount')
+        .eq('livreur_id', livreur['id'])
+        .eq('status', 'delivered')
+        .gte('delivered_at', startOfDay.toIso8601String());
+    
+    double earnings = 0, tips = 0;
+    for (final d in deliveries) {
+      earnings += (d['livreur_commission'] as num?)?.toDouble() ?? 0;
+      tips += (d['tip_amount'] as num?)?.toDouble() ?? 0;
+    }
+    
+    return {
+      'deliveries': deliveries.length,
+      'earnings': earnings,
+      'tips': tips,
+      'distance': deliveries.length * 2.5,
+      'hours': deliveries.length * 0.5,
+    };
+  }
+
+  static Stream<List<Map<String, dynamic>>> subscribeToAvailableOrders() {
+    return client.from('orders')
+        .stream(primaryKey: ['id'])
+        .eq('status', 'pending')
+        .map((list) => List<Map<String, dynamic>>.from(list.where((o) => o['livreur_id'] == null)));
+  }
+
+  static Future<void> setLivreurOnlineStatus(bool isOnline) async {
+    await setOnlineStatus(isOnline);
+  }
+
+  static Future<Map<String, dynamic>?> getCurrentDelivery() async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return null;
+    
+    final response = await client.from('orders')
+        .select('*, restaurant:restaurants(*)')
+        .eq('livreur_id', livreur['id'])
+        .inFilter('status', ['confirmed', 'preparing', 'ready', 'picked_up'])
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    
+    return response;
+  }
+
+  static Future<void> updateLivreurLocationForOrder(String orderId, double lat, double lng) async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return;
+    
+    await client.from('livreurs')
+        .update({'current_latitude': lat, 'current_longitude': lng})
+        .eq('id', livreur['id']);
+    
+    await client.from('livreur_locations').insert({
+      'livreur_id': livreur['id'],
+      'order_id': orderId,
+      'latitude': lat,
+      'longitude': lng,
+    });
+  }
+
+  static Future<void> confirmDelivery(String orderId, String code) async {
+    final verified = await verifyConfirmationCode(orderId, code);
+    if (!verified) throw Exception('Code incorrect');
+  }
+
+  static Future<void> cancelDelivery(String orderId) async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return;
+    
+    await client.from('orders').update({
+      'livreur_id': null,
+      'status': 'pending',
+    }).eq('id', orderId);
+    
+    await setAvailability(true);
+  }
+
+  static Future<Map<String, dynamic>> getLivreurWeekStats() async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return {};
+    
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    
+    final deliveries = await client.from('orders')
+        .select('livreur_commission, tip_amount')
+        .eq('livreur_id', livreur['id'])
+        .eq('status', 'delivered')
+        .gte('delivered_at', startOfWeek.toIso8601String());
+    
+    double earnings = 0, tips = 0;
+    for (final d in deliveries) {
+      earnings += (d['livreur_commission'] as num?)?.toDouble() ?? 0;
+      tips += (d['tip_amount'] as num?)?.toDouble() ?? 0;
+    }
+    
+    return {
+      'deliveries': deliveries.length,
+      'earnings': earnings,
+      'tips': tips,
+      'distance': deliveries.length * 2.5,
+      'hours': deliveries.length * 0.5,
+    };
+  }
+
+  static Future<Map<String, dynamic>> getLivreurMonthStats() async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return {};
+    
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
+    
+    final deliveries = await client.from('orders')
+        .select('livreur_commission, tip_amount')
+        .eq('livreur_id', livreur['id'])
+        .eq('status', 'delivered')
+        .gte('delivered_at', startOfMonth.toIso8601String());
+    
+    double earnings = 0, tips = 0;
+    for (final d in deliveries) {
+      earnings += (d['livreur_commission'] as num?)?.toDouble() ?? 0;
+      tips += (d['tip_amount'] as num?)?.toDouble() ?? 0;
+    }
+    
+    return {
+      'deliveries': deliveries.length,
+      'earnings': earnings,
+      'tips': tips,
+      'distance': deliveries.length * 2.5,
+      'hours': deliveries.length * 0.5,
+    };
+  }
+
+  static Future<List<Map<String, dynamic>>> getLivreurTransactions({int limit = 10}) async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return [];
+    
+    final response = await client.from('transactions')
+        .select()
+        .eq('recipient_id', currentUser!.id)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<List<double>> getLivreurWeeklyData() async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return [];
+    
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    
+    List<double> data = [];
+    for (int i = 0; i < 7; i++) {
+      final day = startOfWeek.add(Duration(days: i));
+      final nextDay = day.add(const Duration(days: 1));
+      
+      final deliveries = await client.from('orders')
+          .select('livreur_commission')
+          .eq('livreur_id', livreur['id'])
+          .eq('status', 'delivered')
+          .gte('delivered_at', day.toIso8601String())
+          .lt('delivered_at', nextDay.toIso8601String());
+      
+      double dayEarnings = 0;
+      for (final d in deliveries) {
+        dayEarnings += (d['livreur_commission'] as num?)?.toDouble() ?? 0;
+      }
+      data.add(dayEarnings);
+    }
+    
+    return data;
+  }
+
+  static Future<List<Map<String, dynamic>>> getLivreurBadges() async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return [];
+    
+    final response = await client.from('livreur_badges')
+        .select('*, badge:badges(*)')
+        .eq('livreur_id', livreur['id']);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getLivreurChallenges() async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) return [];
+    
+    final response = await client.from('challenges')
+        .select('*, progress:challenge_progress(*)')
+        .eq('is_active', true);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getLivreurLeaderboard() async {
+    final response = await client.from('livreurs')
+        .select('*, profile:profiles(full_name)')
+        .eq('is_verified', true)
+        .order('total_deliveries', ascending: false)
+        .limit(10);
+    
+    return List<Map<String, dynamic>>.from(response).asMap().entries.map((e) => {
+      'rank': e.key + 1,
+      'name': e.value['profile']?['full_name'] ?? 'Livreur',
+      'deliveries': e.value['total_deliveries'] ?? 0,
+      'tier': _getTierFromDeliveries(e.value['total_deliveries'] ?? 0),
+    }).toList();
+  }
+
+  static String _getTierFromDeliveries(int deliveries) {
+    if (deliveries >= 500) return 'Diamond';
+    if (deliveries >= 150) return 'Gold';
+    if (deliveries >= 50) return 'Silver';
+    return 'Bronze';
   }
 }

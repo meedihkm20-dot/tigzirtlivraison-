@@ -503,12 +503,11 @@ BEGIN
         'restaurant'::VARCHAR,
         r.id,
         r.name,
-        p.email,
+        u.email,
         r.phone,
         r.created_at
     FROM public.restaurants r
     JOIN auth.users u ON u.id = r.owner_id
-    JOIN public.profiles p ON p.id = r.owner_id
     WHERE r.is_verified = false
     
     UNION ALL

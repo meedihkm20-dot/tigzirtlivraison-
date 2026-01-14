@@ -79,10 +79,11 @@ export class Livreur {
 
   @UpdateDateColumn()
   updatedAt: Date;
-}
-
 
   // Relations
   @OneToMany(() => LivreurZone, zone => zone.livreur)
   zones: LivreurZone[];
+
+  // Orders relation - lazy loaded to avoid circular dependency
+  orders?: any[];
 }

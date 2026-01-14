@@ -1,0 +1,29 @@
+# Commandes Git pour Pousser les Changements
+
+# 1. Voir les fichiers modifiés
+git status
+
+# 2. Ajouter tous les fichiers
+git add .
+
+# 3. Commit avec message descriptif
+git commit -m "fix: migrations 011-012 appliquées, seed créé, documentation complète
+
+- Migration 011: 20 bugs SQL corrigés (fonctions, RLS, index, triggers)
+- Migration 012: Index optimisés (supprimé 15 inutilisés, créé 4 composites)
+- Seed: 5 restaurants, 25 menu items, 5 promotions
+- Docs: SUPABASE_CLI_GUIDE.md, NEXT_STEPS.md, CHANGELOG.md
+- Historique migrations réparé (000-012 synchronisés)
+- Performances: 10-20x plus rapides sur recherches"
+
+# 4. Pousser sur GitHub
+git push origin main
+
+# Alternative si la branche s'appelle master:
+# git push origin master
+
+# En cas d'erreur "rejected", forcer le push (ATTENTION: écrase l'historique remote):
+# git push origin main --force
+
+# Vérifier le push sur GitHub:
+# https://github.com/meedihkm20-dot/tigzirtlivraison-

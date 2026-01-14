@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
 
-/// Service Supabase centralisé pour l'app Admin
+/// Service Supabase centralisé pour l'app Admin V2
+/// Avec audit logs, rôles granulaires et sécurité renforcée
 class SupabaseService {
   static SupabaseClient get client => Supabase.instance.client;
   
@@ -11,6 +14,7 @@ class SupabaseService {
     await Supabase.initialize(
       url: supabaseUrl,
       anonKey: supabaseAnonKey,
+      realtimeClientOptions: const RealtimeClientOptions(eventsPerSecond: 10),
     );
   }
 
@@ -25,10 +29,19 @@ class SupabaseService {
     required String email,
     required String password,
   }) async {
-    return await client.auth.signInWithPassword(
+    final response = await client.auth.signInWithPassword(
       email: email,
       password: password,
     );
+    
+    // Mettre à jour last_login
+    if (response.user != null) {
+      await client.from('admin_users')
+          .update({'last_login_at': DateTime.now().toIso8601String()})
+          .eq('user_id', response.user!.id);
+    }
+    
+    return response;
   }
 
   static Future<bool> isAdmin() async {
@@ -37,12 +50,180 @@ class SupabaseService {
         .from('profiles')
         .select('role')
         .eq('id', currentUser!.id)
-        .single();
-    return profile['role'] == 'admin';
+        .maybeSingle();
+    return profile?['role'] == 'admin';
+  }
+
+  static Future<String?> getAdminRole() async {
+    if (currentUser == null) return null;
+    final admin = await client
+        .from('admin_users')
+        .select('admin_role')
+        .eq('user_id', currentUser!.id)
+        .maybeSingle();
+    return admin?['admin_role'] as String?;
+  }
+
+  static Future<Map<String, dynamic>?> getAdminProfile() async {
+    if (currentUser == null) return null;
+    final admin = await client
+        .from('admin_users')
+        .select('*, profile:profiles!user_id(full_name, email:id)')
+        .eq('user_id', currentUser!.id)
+        .maybeSingle();
+    return admin;
   }
 
   static Future<void> signOut() async {
     await client.auth.signOut();
+  }
+
+  // ============================================
+  // AUDIT LOGS (CRITIQUE)
+  // ============================================
+
+  static Future<void> logAction({
+    required String action,
+    required String entityType,
+    String? entityId,
+    Map<String, dynamic>? oldValue,
+    Map<String, dynamic>? newValue,
+    String? reason,
+  }) async {
+    try {
+      await client.from('admin_audit_logs').insert({
+        'admin_id': currentUser?.id,
+        'admin_role': await getAdminRole(),
+        'action': action,
+        'entity_type': entityType,
+        'entity_id': entityId,
+        'old_value': oldValue,
+        'new_value': newValue,
+        'reason': reason,
+      });
+    } catch (e) {
+      // Ne pas bloquer l'action si le log échoue
+      print('Audit log error: $e');
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getAuditLogs({
+    int limit = 100,
+    String? entityType,
+    String? action,
+  }) async {
+    var query = client.from('admin_audit_logs')
+        .select('*, admin:profiles!admin_id(full_name)')
+        .order('created_at', ascending: false)
+        .limit(limit);
+    
+    if (entityType != null) {
+      query = query.eq('entity_type', entityType);
+    }
+    if (action != null) {
+      query = query.eq('action', action);
+    }
+    
+    final response = await query;
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // ============================================
+  // DASHBOARD TEMPS RÉEL
+  // ============================================
+
+  static Future<Map<String, dynamic>> getDashboardStats() async {
+    try {
+      final response = await client.rpc('get_admin_dashboard_stats');
+      if (response is Map) {
+        return Map<String, dynamic>.from(response);
+      }
+    } catch (e) {
+      print('Dashboard stats error: $e');
+    }
+    
+    // Fallback
+    return await _getDashboardStatsFallback();
+  }
+
+  static Future<Map<String, dynamic>> _getDashboardStatsFallback() async {
+    final today = DateTime.now();
+    final startOfDay = DateTime(today.year, today.month, today.day);
+
+    final pendingOrders = await client.from('orders').select('id').eq('status', 'pending').count(CountOption.exact);
+    final preparingOrders = await client.from('orders').select('id').inFilter('status', ['confirmed', 'preparing']).count(CountOption.exact);
+    final deliveringOrders = await client.from('orders').select('id').inFilter('status', ['picked_up', 'delivering']).count(CountOption.exact);
+    
+    final todayOrders = await client.from('orders')
+        .select('total, admin_commission, status')
+        .gte('created_at', startOfDay.toIso8601String());
+
+    double todayRevenue = 0, todayCommission = 0;
+    int todayDelivered = 0;
+    for (var order in todayOrders) {
+      if (order['status'] == 'delivered') {
+        todayRevenue += (order['total'] ?? 0).toDouble();
+        todayCommission += (order['admin_commission'] ?? 0).toDouble();
+        todayDelivered++;
+      }
+    }
+
+    final restaurants = await client.from('restaurants').select('is_verified, is_open');
+    final livreurs = await client.from('livreurs').select('is_verified, is_online, is_available');
+    
+    int onlineRestaurants = 0, pendingRestaurants = 0;
+    for (var r in restaurants) {
+      if (r['is_verified'] == true && r['is_open'] == true) onlineRestaurants++;
+      if (r['is_verified'] == false) pendingRestaurants++;
+    }
+
+    int onlineLivreurs = 0, availableLivreurs = 0, pendingLivreurs = 0;
+    for (var l in livreurs) {
+      if (l['is_verified'] == true && l['is_online'] == true) onlineLivreurs++;
+      if (l['is_verified'] == true && l['is_online'] == true && l['is_available'] == true) availableLivreurs++;
+      if (l['is_verified'] == false) pendingLivreurs++;
+    }
+
+    return {
+      'pending_orders': pendingOrders.count,
+      'preparing_orders': preparingOrders.count,
+      'delivering_orders': deliveringOrders.count,
+      'today_orders': todayOrders.length,
+      'today_delivered': todayDelivered,
+      'today_revenue': todayRevenue,
+      'today_commission': todayCommission,
+      'total_restaurants': restaurants.length,
+      'online_restaurants': onlineRestaurants,
+      'pending_restaurants': pendingRestaurants,
+      'total_livreurs': livreurs.length,
+      'online_livreurs': onlineLivreurs,
+      'available_livreurs': availableLivreurs,
+      'pending_livreurs': pendingLivreurs,
+    };
+  }
+
+  // Realtime subscription pour le dashboard
+  static RealtimeChannel subscribeToDashboard(void Function() onUpdate) {
+    return client.channel('admin_dashboard')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'orders',
+          callback: (_) => onUpdate(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'livreurs',
+          callback: (_) => onUpdate(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'restaurants',
+          callback: (_) => onUpdate(),
+        )
+        .subscribe();
   }
 
   // ============================================
@@ -52,7 +233,7 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> getAllRestaurants() async {
     final response = await client
         .from('restaurants')
-        .select('*, owner:profiles!owner_id(full_name, phone, email:id)')
+        .select('*, owner:profiles!owner_id(full_name, phone)')
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response);
   }
@@ -66,22 +247,63 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
-  static Future<void> verifyRestaurant(String restaurantId) async {
+  static Future<void> verifyRestaurant(String restaurantId, {String? reason}) async {
+    final old = await client.from('restaurants').select().eq('id', restaurantId).single();
+    
     await client.from('restaurants').update({
       'is_verified': true,
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', restaurantId);
+
+    await logAction(
+      action: 'verify_restaurant',
+      entityType: 'restaurant',
+      entityId: restaurantId,
+      oldValue: {'is_verified': false},
+      newValue: {'is_verified': true},
+      reason: reason ?? 'Validation manuelle',
+    );
   }
 
-  static Future<void> toggleRestaurantStatus(String restaurantId, bool isOpen) async {
+  static Future<void> toggleRestaurantStatus(String restaurantId, bool isOpen, {String? reason}) async {
     await client.from('restaurants').update({
       'is_open': isOpen,
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', restaurantId);
+
+    await logAction(
+      action: isOpen ? 'enable_restaurant' : 'disable_restaurant',
+      entityType: 'restaurant',
+      entityId: restaurantId,
+      oldValue: {'is_open': !isOpen},
+      newValue: {'is_open': isOpen},
+      reason: reason,
+    );
   }
 
-  static Future<void> deleteRestaurant(String restaurantId) async {
-    await client.from('restaurants').delete().eq('id', restaurantId);
+  static Future<void> suspendRestaurant(String restaurantId, String reason, {DateTime? expiresAt}) async {
+    final restaurant = await client.from('restaurants').select('owner_id').eq('id', restaurantId).single();
+    
+    await client.from('user_suspensions').insert({
+      'user_id': restaurant['owner_id'],
+      'user_type': 'restaurant',
+      'reason': reason,
+      'suspended_by': currentUser?.id,
+      'expires_at': expiresAt?.toIso8601String(),
+    });
+
+    await client.from('restaurants').update({
+      'is_open': false,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', restaurantId);
+
+    await logAction(
+      action: 'suspend_restaurant',
+      entityType: 'restaurant',
+      entityId: restaurantId,
+      newValue: {'suspended': true, 'expires_at': expiresAt?.toIso8601String()},
+      reason: reason,
+    );
   }
 
   // ============================================
@@ -91,7 +313,7 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> getAllLivreurs() async {
     final response = await client
         .from('livreurs')
-        .select('*, user:profiles!user_id(full_name, phone, email:id)')
+        .select('*, user:profiles!user_id(full_name, phone)')
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response);
   }
@@ -105,253 +327,319 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
-  static Future<void> verifyLivreur(String livreurId) async {
+  static Future<List<Map<String, dynamic>>> getOnlineLivreurs() async {
+    final response = await client
+        .from('livreurs')
+        .select('*, user:profiles!user_id(full_name, phone)')
+        .eq('is_verified', true)
+        .eq('is_online', true)
+        .order('is_available', ascending: false);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  static Future<void> verifyLivreur(String livreurId, {String? reason}) async {
     await client.from('livreurs').update({
       'is_verified': true,
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', livreurId);
+
+    await logAction(
+      action: 'verify_livreur',
+      entityType: 'livreur',
+      entityId: livreurId,
+      oldValue: {'is_verified': false},
+      newValue: {'is_verified': true},
+      reason: reason ?? 'Validation manuelle',
+    );
   }
 
-  static Future<void> toggleLivreurStatus(String livreurId, bool isAvailable) async {
+  static Future<void> suspendLivreur(String livreurId, String reason, {DateTime? expiresAt}) async {
+    final livreur = await client.from('livreurs').select('user_id').eq('id', livreurId).single();
+    
+    await client.from('user_suspensions').insert({
+      'user_id': livreur['user_id'],
+      'user_type': 'livreur',
+      'reason': reason,
+      'suspended_by': currentUser?.id,
+      'expires_at': expiresAt?.toIso8601String(),
+    });
+
     await client.from('livreurs').update({
-      'is_available': isAvailable,
+      'is_online': false,
+      'is_available': false,
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', livreurId);
-  }
 
-  static Future<void> deleteLivreur(String livreurId) async {
-    await client.from('livreurs').delete().eq('id', livreurId);
+    await logAction(
+      action: 'suspend_livreur',
+      entityType: 'livreur',
+      entityId: livreurId,
+      newValue: {'suspended': true, 'expires_at': expiresAt?.toIso8601String()},
+      reason: reason,
+    );
   }
-
 
   // ============================================
   // ORDERS MANAGEMENT
   // ============================================
   
-  static Future<List<Map<String, dynamic>>> getAllOrders({int limit = 100}) async {
-    final response = await client
-        .from('orders')
-        .select('''
-          *,
-          customer:profiles!customer_id(full_name, phone),
-          restaurant:restaurants!restaurant_id(name),
-          livreur:livreurs!livreur_id(user:profiles!user_id(full_name))
-        ''')
+  static Future<List<Map<String, dynamic>>> getAllOrders({
+    int limit = 100,
+    String? status,
+    String? search,
+  }) async {
+    var query = client.from('orders').select('''
+      *,
+      customer:profiles!customer_id(full_name, phone),
+      restaurant:restaurants!restaurant_id(name, phone),
+      livreur:livreurs!livreur_id(user:profiles!user_id(full_name, phone))
+    ''').order('created_at', ascending: false).limit(limit);
+
+    if (status != null && status.isNotEmpty) {
+      query = query.eq('status', status);
+    }
+
+    final response = await query;
+    var orders = List<Map<String, dynamic>>.from(response);
+
+    // Filtrer par recherche côté client si nécessaire
+    if (search != null && search.isNotEmpty) {
+      final searchLower = search.toLowerCase();
+      orders = orders.where((o) {
+        final orderNumber = (o['order_number'] ?? '').toString().toLowerCase();
+        final customerName = (o['customer']?['full_name'] ?? '').toString().toLowerCase();
+        final customerPhone = (o['customer']?['phone'] ?? '').toString().toLowerCase();
+        return orderNumber.contains(searchLower) ||
+               customerName.contains(searchLower) ||
+               customerPhone.contains(searchLower);
+      }).toList();
+    }
+
+    return orders;
+  }
+
+  static Future<Map<String, dynamic>?> getOrderDetails(String orderId) async {
+    final response = await client.from('orders').select('''
+      *,
+      customer:profiles!customer_id(full_name, phone, email:id),
+      restaurant:restaurants!restaurant_id(name, phone, address),
+      livreur:livreurs!livreur_id(*, user:profiles!user_id(full_name, phone)),
+      order_items(*)
+    ''').eq('id', orderId).single();
+    return response;
+  }
+
+  static Future<List<Map<String, dynamic>>> getOrderTimeline(String orderId) async {
+    // Récupérer les événements d'audit pour cette commande
+    final logs = await client.from('admin_audit_logs')
+        .select()
+        .eq('entity_type', 'order')
+        .eq('entity_id', orderId)
+        .order('created_at', ascending: true);
+    
+    // Récupérer aussi les changements de statut depuis audit_events
+    final events = await client.from('audit_events')
+        .select()
+        .eq('table_name', 'orders')
+        .eq('record_id', orderId)
+        .order('created_at', ascending: true);
+
+    return [...List<Map<String, dynamic>>.from(logs), ...List<Map<String, dynamic>>.from(events)];
+  }
+
+  /// Forcer le changement de statut (admin only)
+  static Future<void> forceOrderStatus(String orderId, String newStatus, String reason) async {
+    final order = await client.from('orders').select('status').eq('id', orderId).single();
+    final oldStatus = order['status'];
+
+    await client.from('orders').update({
+      'status': newStatus,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', orderId);
+
+    await logAction(
+      action: 'force_order_status',
+      entityType: 'order',
+      entityId: orderId,
+      oldValue: {'status': oldStatus},
+      newValue: {'status': newStatus},
+      reason: reason,
+    );
+  }
+
+  /// Réassigner un livreur
+  static Future<void> reassignLivreur(String orderId, String newLivreurId, String reason) async {
+    final order = await client.from('orders').select('livreur_id').eq('id', orderId).single();
+    final oldLivreurId = order['livreur_id'];
+
+    // Libérer l'ancien livreur
+    if (oldLivreurId != null) {
+      await client.from('livreurs').update({'is_available': true}).eq('id', oldLivreurId);
+    }
+
+    // Assigner le nouveau
+    await client.from('orders').update({
+      'livreur_id': newLivreurId,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', orderId);
+
+    await client.from('livreurs').update({'is_available': false}).eq('id', newLivreurId);
+
+    await logAction(
+      action: 'reassign_livreur',
+      entityType: 'order',
+      entityId: orderId,
+      oldValue: {'livreur_id': oldLivreurId},
+      newValue: {'livreur_id': newLivreurId},
+      reason: reason,
+    );
+  }
+
+  /// Annuler une commande (admin)
+  static Future<void> adminCancelOrder(String orderId, String reason) async {
+    final order = await client.from('orders').select('status, livreur_id').eq('id', orderId).single();
+    
+    await client.from('orders').update({
+      'status': 'cancelled',
+      'cancelled_at': DateTime.now().toIso8601String(),
+      'cancellation_reason': reason,
+      'cancelled_by': 'admin',
+    }).eq('id', orderId);
+
+    // Libérer le livreur si assigné
+    if (order['livreur_id'] != null) {
+      await client.from('livreurs').update({'is_available': true}).eq('id', order['livreur_id']);
+    }
+
+    await logAction(
+      action: 'admin_cancel_order',
+      entityType: 'order',
+      entityId: orderId,
+      oldValue: {'status': order['status']},
+      newValue: {'status': 'cancelled'},
+      reason: reason,
+    );
+  }
+
+  // ============================================
+  // INCIDENTS
+  // ============================================
+
+  static Future<List<Map<String, dynamic>>> getIncidents({
+    String? status,
+    String? priority,
+    int limit = 50,
+  }) async {
+    var query = client.from('incidents')
+        .select('*, order:orders(order_number), assigned:profiles!assigned_to(full_name)')
         .order('created_at', ascending: false)
         .limit(limit);
+
+    if (status != null) query = query.eq('status', status);
+    if (priority != null) query = query.eq('priority', priority);
+
+    final response = await query;
     return List<Map<String, dynamic>>.from(response);
   }
 
-  static Future<List<Map<String, dynamic>>> getTodayOrders() async {
-    final today = DateTime.now();
-    final startOfDay = DateTime(today.year, today.month, today.day);
+  static Future<void> createIncident({
+    required String title,
+    required String incidentType,
+    String? description,
+    String? priority,
+    String? orderId,
+    String? customerId,
+    String? restaurantId,
+    String? livreurId,
+  }) async {
+    final incident = await client.from('incidents').insert({
+      'title': title,
+      'description': description,
+      'incident_type': incidentType,
+      'priority': priority ?? 'medium',
+      'order_id': orderId,
+      'customer_id': customerId,
+      'restaurant_id': restaurantId,
+      'livreur_id': livreurId,
+      'created_by': currentUser?.id,
+    }).select().single();
+
+    await logAction(
+      action: 'create_incident',
+      entityType: 'incident',
+      entityId: incident['id'],
+      newValue: {'title': title, 'type': incidentType},
+    );
+  }
+
+  static Future<void> updateIncidentStatus(String incidentId, String status, {String? resolution}) async {
+    final updates = <String, dynamic>{
+      'status': status,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    if (status == 'resolved' || status == 'closed') {
+      updates['resolved_at'] = DateTime.now().toIso8601String();
+      updates['resolved_by'] = currentUser?.id;
+      if (resolution != null) updates['resolution'] = resolution;
+    }
+
+    await client.from('incidents').update(updates).eq('id', incidentId);
+
+    await logAction(
+      action: 'update_incident',
+      entityType: 'incident',
+      entityId: incidentId,
+      newValue: {'status': status},
+    );
+  }
+
+  // ============================================
+  // PARAMÈTRES PLATEFORME
+  // ============================================
+
+  static Future<Map<String, dynamic>> getPlatformSettings() async {
+    final response = await client.from('platform_settings').select();
+    final settings = <String, dynamic>{};
+    for (var s in response) {
+      settings[s['key']] = s['value'];
+    }
+    return settings;
+  }
+
+  static Future<void> updatePlatformSetting(String key, dynamic value, {String? reason}) async {
+    final old = await client.from('platform_settings').select('value').eq('key', key).single();
     
-    final response = await client
-        .from('orders')
-        .select('*, restaurant:restaurants!restaurant_id(name)')
-        .gte('created_at', startOfDay.toIso8601String())
-        .order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(response);
+    await client.from('platform_settings').update({
+      'value': value.toString(),
+      'updated_by': currentUser?.id,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('key', key);
+
+    await logAction(
+      action: 'update_setting',
+      entityType: 'settings',
+      oldValue: {'key': key, 'value': old['value']},
+      newValue: {'key': key, 'value': value},
+      reason: reason,
+    );
   }
 
   // ============================================
-  // FINANCE & STATISTICS (avec commissions)
+  // FINANCE
   // ============================================
-  
-  static Future<Map<String, dynamic>> getDashboardStats() async {
-    final today = DateTime.now();
-    final startOfDay = DateTime(today.year, today.month, today.day);
-    final startOfMonth = DateTime(today.year, today.month, 1);
-
-    // Total restaurants
-    final restaurantsCount = await client
-        .from('restaurants')
-        .select('id')
-        .count(CountOption.exact);
-
-    // Pending restaurants
-    final pendingRestaurants = await client
-        .from('restaurants')
-        .select('id')
-        .eq('is_verified', false)
-        .count(CountOption.exact);
-
-    // Total livreurs
-    final livreursCount = await client
-        .from('livreurs')
-        .select('id')
-        .count(CountOption.exact);
-
-    // Pending livreurs
-    final pendingLivreurs = await client
-        .from('livreurs')
-        .select('id')
-        .eq('is_verified', false)
-        .count(CountOption.exact);
-
-    // Today orders avec commissions
-    final todayOrders = await client
-        .from('orders')
-        .select('id, total, admin_commission, livreur_commission, restaurant_amount')
-        .gte('created_at', startOfDay.toIso8601String());
-
-    // Month orders
-    final monthOrders = await client
-        .from('orders')
-        .select('id, total, admin_commission')
-        .gte('created_at', startOfMonth.toIso8601String())
-        .eq('status', 'delivered');
-
-    // Calculate totals
-    double todayRevenue = 0;
-    double todayCommission = 0;
-    for (var order in todayOrders) {
-      todayRevenue += (order['total'] ?? 0).toDouble();
-      todayCommission += (order['admin_commission'] ?? 0).toDouble();
-    }
-
-    double monthRevenue = 0;
-    double monthCommission = 0;
-    for (var order in monthOrders) {
-      monthRevenue += (order['total'] ?? 0).toDouble();
-      monthCommission += (order['admin_commission'] ?? 0).toDouble();
-    }
-
-    return {
-      'total_restaurants': restaurantsCount.count,
-      'pending_restaurants': pendingRestaurants.count,
-      'total_livreurs': livreursCount.count,
-      'pending_livreurs': pendingLivreurs.count,
-      'today_orders': todayOrders.length,
-      'today_revenue': todayRevenue,
-      'today_commission': todayCommission,
-      'month_orders': monthOrders.length,
-      'month_revenue': monthRevenue,
-      'month_commission': monthCommission,
-    };
-  }
-
-  /// Stats admin avec les vraies commissions
-  static Future<Map<String, dynamic>> getAdminStats() async {
-    try {
-      final response = await client.rpc('get_admin_stats');
-      if (response is List && response.isNotEmpty) {
-        return Map<String, dynamic>.from(response.first);
-      }
-    } catch (e) {
-      // Fallback si la fonction n'existe pas encore
-    }
-    return {
-      'total_orders': 0,
-      'total_revenue': 0,
-      'total_admin_commission': 0,
-      'today_orders': 0,
-      'today_commission': 0,
-      'pending_restaurant_payments': 0,
-    };
-  }
-
-  /// Récupérer toutes les transactions
-  static Future<List<Map<String, dynamic>>> getAllTransactions({int limit = 100}) async {
-    try {
-      final response = await client
-          .from('transactions')
-          .select('*, order:orders(order_number)')
-          .order('created_at', ascending: false)
-          .limit(limit);
-      return List<Map<String, dynamic>>.from(response);
-    } catch (e) {
-      return [];
-    }
-  }
-
-  /// Paiements en attente pour les restaurants
-  static Future<List<Map<String, dynamic>>> getPendingRestaurantPayments() async {
-    try {
-      final response = await client
-          .from('transactions')
-          .select('*, order:orders(order_number), restaurant:profiles!recipient_id(full_name)')
-          .eq('type', 'restaurant_payment')
-          .eq('status', 'pending')
-          .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response);
-    } catch (e) {
-      return [];
-    }
-  }
-
-  /// Marquer un paiement restaurant comme effectué
-  static Future<void> markPaymentCompleted(String transactionId) async {
-    await client.from('transactions').update({
-      'status': 'completed',
-    }).eq('id', transactionId);
-  }
-
-  static Future<List<Map<String, dynamic>>> getRestaurantTransactions(String restaurantId) async {
-    final response = await client
-        .from('orders')
-        .select('id, order_number, total, delivery_fee, admin_commission, restaurant_amount, status, created_at')
-        .eq('restaurant_id', restaurantId)
-        .eq('status', 'delivered')
-        .order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(response);
-  }
-
-  static Future<Map<String, dynamic>> getRestaurantFinanceStats(String restaurantId) async {
-    final orders = await client
-        .from('orders')
-        .select('total, admin_commission, restaurant_amount, created_at')
-        .eq('restaurant_id', restaurantId)
-        .eq('status', 'delivered');
-
-    double totalRevenue = 0;
-    double totalCommission = 0;
-    double netRevenue = 0;
-
-    for (var order in orders) {
-      totalRevenue += (order['total'] ?? 0).toDouble();
-      totalCommission += (order['admin_commission'] ?? 0).toDouble();
-      netRevenue += (order['restaurant_amount'] ?? 0).toDouble();
-    }
-
-    return {
-      'total_orders': orders.length,
-      'total_revenue': totalRevenue,
-      'total_commission': totalCommission,
-      'net_revenue': netRevenue,
-    };
-  }
-
-  static Future<List<Map<String, dynamic>>> getAllRestaurantsWithStats() async {
-    final restaurants = await getAllRestaurants();
-    List<Map<String, dynamic>> result = [];
-
-    for (var restaurant in restaurants) {
-      final stats = await getRestaurantFinanceStats(restaurant['id']);
-      result.add({
-        ...restaurant,
-        'stats': stats,
-      });
-    }
-
-    return result;
-  }
 
   static Future<Map<String, dynamic>> getGlobalFinanceReport() async {
-    final today = DateTime.now();
-    final startOfMonth = DateTime(today.year, today.month, 1);
-
     final deliveredOrders = await client
         .from('orders')
         .select('total, delivery_fee, admin_commission, livreur_commission, restaurant_amount, created_at')
         .eq('status', 'delivered');
 
-    double totalRevenue = 0;
-    double totalAdminCommission = 0;
-    double totalLivreurCommission = 0;
-    double totalRestaurantAmount = 0;
-    double monthRevenue = 0;
-    double monthCommission = 0;
+    final today = DateTime.now();
+    final startOfMonth = DateTime(today.year, today.month, 1);
+
+    double totalRevenue = 0, totalAdminCommission = 0, totalLivreurCommission = 0;
+    double totalRestaurantAmount = 0, monthRevenue = 0, monthCommission = 0;
 
     for (var order in deliveredOrders) {
       totalRevenue += (order['total'] ?? 0).toDouble();
@@ -375,5 +663,45 @@ class SupabaseService {
       'month_revenue': monthRevenue,
       'month_commission': monthCommission,
     };
+  }
+
+  static Future<List<Map<String, dynamic>>> getAllRestaurantsWithStats() async {
+    final restaurants = await getAllRestaurants();
+    List<Map<String, dynamic>> result = [];
+
+    for (var restaurant in restaurants) {
+      final orders = await client
+          .from('orders')
+          .select('total, admin_commission, restaurant_amount')
+          .eq('restaurant_id', restaurant['id'])
+          .eq('status', 'delivered');
+
+      double totalRevenue = 0, totalCommission = 0, netRevenue = 0;
+      for (var order in orders) {
+        totalRevenue += (order['total'] ?? 0).toDouble();
+        totalCommission += (order['admin_commission'] ?? 0).toDouble();
+        netRevenue += (order['restaurant_amount'] ?? 0).toDouble();
+      }
+
+      result.add({
+        ...restaurant,
+        'stats': {
+          'total_orders': orders.length,
+          'total_revenue': totalRevenue,
+          'total_commission': totalCommission,
+          'net_revenue': netRevenue,
+        },
+      });
+    }
+
+    return result;
+  }
+
+  // ============================================
+  // UTILS
+  // ============================================
+
+  static Future<void> unsubscribe(RealtimeChannel channel) async {
+    await client.removeChannel(channel);
   }
 }

@@ -92,7 +92,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         return await SupabaseService.getNearbyRestaurants(
           latitude: position.latitude,
           longitude: position.longitude,
-          radiusKm: 10,
+          radiusKm: 10000, // Temporaire: rayon énorme pour tester
         );
       }
     } catch (e) {

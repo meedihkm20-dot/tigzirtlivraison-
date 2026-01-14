@@ -21,12 +21,25 @@ import '../../features/customer/presentation/referral_screen.dart';
 import '../../features/shared/presentation/chat_screen.dart';
 // Restaurant
 import '../../features/restaurant/presentation/restaurant_home_screen.dart';
+import '../../features/restaurant/presentation/screens/restaurant_dashboard_screen.dart';
+import '../../features/restaurant/presentation/screens/kitchen_screen_v2.dart';
+import '../../features/restaurant/presentation/screens/stats_screen_v2.dart';
+import '../../features/restaurant/presentation/screens/stock_management_screen.dart';
+import '../../features/restaurant/presentation/screens/team_management_screen.dart';
+import '../../features/restaurant/presentation/screens/reports_screen.dart';
+import '../../features/restaurant/presentation/screens/settings_screen.dart';
 import '../../features/restaurant/presentation/menu_screen.dart';
 import '../../features/restaurant/presentation/restaurant_order_detail_screen.dart';
 import '../../features/restaurant/presentation/stats_screen.dart';
 import '../../features/restaurant/presentation/restaurant_profile_screen.dart';
 import '../../features/restaurant/presentation/kitchen_screen.dart';
 import '../../features/restaurant/presentation/promotions_screen.dart';
+// Customer V2
+import '../../features/customer/presentation/screens/restaurant_detail_screen_v2.dart';
+import '../../features/customer/presentation/screens/customer_home_screen_v2.dart';
+import '../../features/customer/presentation/screens/cart_screen_v2.dart';
+import '../../features/customer/presentation/screens/order_tracking_screen_v2.dart';
+import '../../features/customer/presentation/screens/customer_profile_screen_v2.dart';
 // Livreur
 import '../../features/livreur/presentation/livreur_home_screen.dart';
 import '../../features/livreur/presentation/delivery_screen.dart';
@@ -34,6 +47,11 @@ import '../../features/livreur/presentation/earnings_screen.dart';
 import '../../features/livreur/presentation/livreur_profile_screen.dart';
 import '../../features/livreur/presentation/badges_screen.dart';
 import '../../features/livreur/presentation/tier_progress_screen.dart';
+// Livreur V2
+import '../../features/livreur/presentation/screens/livreur_home_screen_v2.dart';
+import '../../features/livreur/presentation/screens/delivery_screen_v2.dart';
+import '../../features/livreur/presentation/screens/earnings_screen_v2.dart';
+import '../../features/livreur/presentation/screens/tier_progress_screen_v2.dart';
 
 class AppRouter {
   // Auth
@@ -56,9 +74,14 @@ class AppRouter {
   static const String menu = '/restaurant/menu';
   static const String restaurantOrderDetail = '/restaurant/order';
   static const String stats = '/restaurant/stats';
+  static const String statsV2 = '/restaurant/stats-v2';
   static const String restaurantProfile = '/restaurant/profile';
   static const String kitchen = '/restaurant/kitchen';
   static const String promotions = '/restaurant/promotions';
+  static const String stockManagement = '/restaurant/stock';
+  static const String teamManagement = '/restaurant/team';
+  static const String reports = '/restaurant/reports';
+  static const String restaurantSettings = '/restaurant/settings';
   
   // Livreur
   static const String livreurHome = '/livreur/home';
@@ -90,25 +113,25 @@ class AppRouter {
         final role = settings.arguments as String? ?? 'restaurant';
         return MaterialPageRoute(builder: (_) => PendingApprovalScreen(role: role));
       
-      // Customer
+      // Customer - Using V2 screens
       case customerHome:
-        return MaterialPageRoute(builder: (_) => const CustomerHomeScreen());
+        return MaterialPageRoute(builder: (_) => const CustomerHomeScreenV2());
       case restaurantDetail:
         final restaurantId = settings.arguments as String;
-        return MaterialPageRoute(builder: (_) => RestaurantDetailScreen(restaurantId: restaurantId));
+        return MaterialPageRoute(builder: (_) => RestaurantDetailScreenV2(restaurantId: restaurantId));
       case cart:
-        return MaterialPageRoute(builder: (_) => const CartScreen());
+        return MaterialPageRoute(builder: (_) => const CartScreenV2());
       case customerOrders:
         return MaterialPageRoute(builder: (_) => const OrdersScreen());
       case orderTracking:
         final orderId = settings.arguments as String;
-        return MaterialPageRoute(builder: (_) => OrderTrackingScreen(orderId: orderId));
+        return MaterialPageRoute(builder: (_) => OrderTrackingScreenV2(orderId: orderId));
       case customerProfile:
-        return MaterialPageRoute(builder: (_) => const CustomerProfileScreen());
+        return MaterialPageRoute(builder: (_) => const CustomerProfileScreenV2());
       
       // Restaurant
       case restaurantHome:
-        return MaterialPageRoute(builder: (_) => const RestaurantHomeScreen());
+        return MaterialPageRoute(builder: (_) => const RestaurantDashboardScreen());
       case menu:
         return MaterialPageRoute(builder: (_) => const MenuScreen());
       case restaurantOrderDetail:
@@ -116,23 +139,33 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => RestaurantOrderDetailScreen(orderId: orderId));
       case stats:
         return MaterialPageRoute(builder: (_) => const StatsScreen());
+      case statsV2:
+        return MaterialPageRoute(builder: (_) => const StatsScreenV2());
       case restaurantProfile:
         return MaterialPageRoute(builder: (_) => const RestaurantProfileScreen());
+      case stockManagement:
+        return MaterialPageRoute(builder: (_) => const StockManagementScreen());
+      case teamManagement:
+        return MaterialPageRoute(builder: (_) => const TeamManagementScreen());
+      case reports:
+        return MaterialPageRoute(builder: (_) => const ReportsScreen());
+      case restaurantSettings:
+        return MaterialPageRoute(builder: (_) => const SettingsScreen());
       
-      // Livreur
+      // Livreur - Using V2 screens
       case livreurHome:
-        return MaterialPageRoute(builder: (_) => const LivreurHomeScreen());
+        return MaterialPageRoute(builder: (_) => const LivreurHomeScreenV2());
       case delivery:
         final orderId = settings.arguments as String;
-        return MaterialPageRoute(builder: (_) => DeliveryScreen(orderId: orderId));
+        return MaterialPageRoute(builder: (_) => DeliveryScreenV2(orderId: orderId));
       case earnings:
-        return MaterialPageRoute(builder: (_) => const EarningsScreen());
+        return MaterialPageRoute(builder: (_) => const EarningsScreenV2());
       case livreurProfile:
         return MaterialPageRoute(builder: (_) => const LivreurProfileScreen());
       case badges:
         return MaterialPageRoute(builder: (_) => const BadgesScreen());
       case tierProgress:
-        return MaterialPageRoute(builder: (_) => const TierProgressScreen());
+        return MaterialPageRoute(builder: (_) => const TierProgressScreenV2());
       
       // Customer extras
       case notifications:
@@ -167,7 +200,7 @@ class AppRouter {
       
       // Restaurant - Kitchen & Promotions
       case kitchen:
-        return MaterialPageRoute(builder: (_) => const KitchenScreen());
+        return MaterialPageRoute(builder: (_) => const KitchenScreenV2());
       case promotions:
         return MaterialPageRoute(builder: (_) => const PromotionsScreen());
       
