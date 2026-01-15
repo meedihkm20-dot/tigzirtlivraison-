@@ -3,6 +3,9 @@ node_modules/
 .pnp
 .pnp.js
 
+# Archive (old files - do not track)
+_archive/
+
 # Build outputs
 dist/
 build/
