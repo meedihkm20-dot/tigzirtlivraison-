@@ -48,6 +48,16 @@ coverage/
 .temp/
 .tmp/
 
+# Documentation locale (ne pas pousser sur GitHub)
+PLAN_TEST_MANUEL.md
+AUDIT_CODE_FONCTIONNALITES.md
+AUDIT_COMPLET_2025.md
+BUGS_RAPPORT.md
+MIGRATION_SUPABASE_TO_BACKEND.md
+supabase/update_admin_password.sql
+supabase/change_admin_password_mehdi.sql
+supabase/debug_admin_account.sql
+
 # Package lock files (optional - uncomment if you want to ignore)
 # package-lock.json
 # yarn.lock
