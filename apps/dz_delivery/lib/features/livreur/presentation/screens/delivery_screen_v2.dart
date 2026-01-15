@@ -793,7 +793,8 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
   void _confirmPickup() async {
     HapticFeedback.heavyImpact();
     try {
-      await SupabaseService.updateOrderStatus(widget.orderId, 'picked_up');
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.changeOrderStatus(widget.orderId, 'picked_up');
       setState(() => _currentStep = 'delivery');
       _loadRoute();
       ScaffoldMessenger.of(context).showSnackBar(

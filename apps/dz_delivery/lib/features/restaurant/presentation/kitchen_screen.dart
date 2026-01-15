@@ -69,7 +69,8 @@ class _KitchenScreenState extends State<KitchenScreen> {
 
   Future<void> _startPreparing(String orderId) async {
     try {
-      await SupabaseService.startPreparing(orderId);
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.changeOrderStatus(orderId, 'preparing');
       _loadOrders();
     } catch (e) {
       if (mounted) {
@@ -82,7 +83,8 @@ class _KitchenScreenState extends State<KitchenScreen> {
 
   Future<void> _markAsReady(String orderId) async {
     try {
-      await SupabaseService.markAsReady(orderId);
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.changeOrderStatus(orderId, 'ready');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Commande prête! 🍽️ Le livreur est notifié'), backgroundColor: Colors.green),

@@ -133,7 +133,8 @@ class _KitchenScreenV2State extends State<KitchenScreenV2>
   Future<void> _startPreparing(String orderId) async {
     HapticFeedback.mediumImpact();
     try {
-      await SupabaseService.startPreparing(orderId);
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.changeOrderStatus(orderId, 'preparing');
       _loadOrders();
     } catch (e) {
       if (mounted) {
@@ -147,7 +148,8 @@ class _KitchenScreenV2State extends State<KitchenScreenV2>
   Future<void> _markAsReady(String orderId) async {
     HapticFeedback.heavyImpact();
     try {
-      await SupabaseService.markAsReady(orderId);
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.changeOrderStatus(orderId, 'ready');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

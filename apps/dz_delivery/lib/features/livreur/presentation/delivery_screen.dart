@@ -164,7 +164,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   Future<void> _pickupOrder() async {
     try {
-      await SupabaseService.updateOrderStatus(widget.orderId, 'picked_up');
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.changeOrderStatus(widget.orderId, 'picked_up');
       await _loadOrder();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -182,7 +183,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   Future<void> _startDelivering() async {
     try {
-      await SupabaseService.updateOrderStatus(widget.orderId, 'delivering');
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.changeOrderStatus(widget.orderId, 'delivering');
       await _loadOrder();
     } catch (e) {
       if (mounted) {

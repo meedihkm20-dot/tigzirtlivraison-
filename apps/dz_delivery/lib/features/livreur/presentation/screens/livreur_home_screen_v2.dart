@@ -6,6 +6,7 @@ import '../../../../core/design_system/theme/app_typography.dart';
 import '../../../../core/design_system/theme/app_spacing.dart';
 import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/services/backend_api_service.dart';
 import '../../../../core/router/app_router.dart';
 
 /// Écran Accueil Livreur V2 - Premium
@@ -939,7 +940,9 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
     HapticFeedback.heavyImpact();
     
     try {
-      await SupabaseService.acceptOrder(order['id']);
+      // ✅ Migration: Utilise le backend au lieu de Supabase direct
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.changeOrderStatus(order['id'], 'accepted');
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

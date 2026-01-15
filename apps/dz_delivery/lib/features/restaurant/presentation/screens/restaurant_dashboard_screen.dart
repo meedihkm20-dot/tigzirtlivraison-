@@ -840,7 +840,8 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
   Future<void> _confirmOrder(String orderId) async {
     HapticFeedback.mediumImpact();
     try {
-      await SupabaseService.confirmOrder(orderId, 30);
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.changeOrderStatus(orderId, 'confirmed');
       _loadData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -862,7 +863,8 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
   Future<void> _startPreparing(String orderId) async {
     HapticFeedback.mediumImpact();
     try {
-      await SupabaseService.startPreparing(orderId);
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.changeOrderStatus(orderId, 'preparing');
       _loadData();
     } catch (e) {
       if (mounted) {
@@ -876,7 +878,8 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
   Future<void> _markAsReady(String orderId) async {
     HapticFeedback.heavyImpact();
     try {
-      await SupabaseService.markAsReady(orderId);
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.changeOrderStatus(orderId, 'ready');
       _loadData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -917,7 +920,8 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
 
     if (confirm == true) {
       try {
-        await SupabaseService.cancelOrder(orderId, 'Refusé par le restaurant');
+        final backendApi = BackendApiService(SupabaseService.client);
+        await backendApi.cancelOrder(orderId, 'restaurant_unavailable', details: 'Refusé par le restaurant');
         _loadData();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

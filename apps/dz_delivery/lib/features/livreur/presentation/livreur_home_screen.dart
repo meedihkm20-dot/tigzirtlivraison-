@@ -88,7 +88,8 @@ class _LivreurHomeScreenState extends State<LivreurHomeScreen> {
 
   Future<void> _acceptOrder(String orderId) async {
     try {
-      await SupabaseService.acceptOrder(orderId);
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.changeOrderStatus(orderId, 'confirmed');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Commande acceptée! 🎉'), backgroundColor: Colors.green),
