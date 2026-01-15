@@ -1421,18 +1421,22 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
       
       final restaurantId = _cartItems.isNotEmpty ? _cartItems.first['restaurant_id'] : '';
       
-      final orderResponse = await SupabaseService.createOrder(
+      // ✅ MIGRATION: Utiliser le backend au lieu de Supabase direct
+      final backendApi = BackendApiService(SupabaseService.client);
+      
+      final orderResponse = await backendApi.createOrder(
         restaurantId: restaurantId,
-        items: _cartItems,
+        items: _cartItems.map((item) => {
+          'menu_item_id': item['menu_item_id'] ?? item['id'],
+          'quantity': item['quantity'],
+        }).toList(),
         deliveryAddress: _selectedAddress!['address'] ?? '',
         deliveryLat: (_selectedAddress!['lat'] as num?)?.toDouble() ?? 0,
         deliveryLng: (_selectedAddress!['lng'] as num?)?.toDouble() ?? 0,
-        deliveryInstructions: _orderNote,
-        subtotal: subtotal,
-        deliveryFee: deliveryFee,
-        total: total,
-        paymentMethod: _paymentMethod,
+        notes: _orderNote,
       );
+
+      final order = orderResponse['order'];
 
       if (mounted) {
         // Clear cart and navigate to tracking
@@ -1440,7 +1444,7 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
         Navigator.pushReplacementNamed(
           context,
           AppRouter.orderTracking,
-          arguments: orderResponse['id'],
+          arguments: order['id'],
         );
       }
     } catch (e) {

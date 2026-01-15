@@ -98,17 +98,23 @@ class _CartScreenState extends State<CartScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final order = await SupabaseService.createOrder(
+      // ✅ MIGRATION: Utiliser le backend au lieu de Supabase direct
+      final backendApi = BackendApiService(SupabaseService.client);
+      
+      final orderResponse = await backendApi.createOrder(
         restaurantId: _restaurantId!,
-        items: _items,
+        items: _items.map((item) => {
+          'menu_item_id': item['id'],
+          'quantity': item['quantity'],
+        }).toList(),
         deliveryAddress: _addressController.text.trim(),
         deliveryLat: 36.8869,
         deliveryLng: 4.1260,
-        subtotal: _subtotal,
-        deliveryFee: _deliveryFee,
-        total: _total,
+        notes: null,
       );
 
+      final order = orderResponse['order'];
+      
       _clearCart();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
