@@ -391,13 +391,13 @@ class SupabaseService {
       customer:profiles!customer_id(full_name, phone),
       restaurant:restaurants!restaurant_id(name, phone),
       livreur:livreurs!livreur_id(user:profiles!user_id(full_name, phone))
-    ''').order('created_at', ascending: false).limit(limit);
+    ''');
 
     if (status != null && status.isNotEmpty) {
       query = query.eq('status', status);
     }
 
-    final response = await query;
+    final response = await query.order('created_at', ascending: false).limit(limit);
     var orders = List<Map<String, dynamic>>.from(response);
 
     // Filtrer par recherche côté client si nécessaire

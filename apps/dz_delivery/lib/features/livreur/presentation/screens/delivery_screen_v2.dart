@@ -247,8 +247,8 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
                               ),
                               Text(
                                 _currentStep == 'pickup'
-                                    ? _order?['restaurant_name'] ?? ''
-                                    : _order?['customer_name'] ?? 'Client',
+                                    ? (_order?['restaurant_name'] as String? ?? '')
+                                    : (_order?['customer_name'] as String? ?? 'Client'),
                                 style: AppTypography.bodySmall.copyWith(
                                   color: AppColors.textTertiary,
                                 ),
@@ -532,14 +532,14 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
   Widget _buildDestinationInfo() {
     final isPickup = _currentStep == 'pickup';
     final name = isPickup 
-        ? _order?['restaurant_name'] ?? 'Restaurant'
-        : _order?['customer_name'] ?? 'Client';
+        ? (_order?['restaurant_name'] as String? ?? 'Restaurant')
+        : (_order?['customer_name'] as String? ?? 'Client');
     final address = isPickup
-        ? _order?['restaurant_address'] ?? ''
-        : _order?['delivery_address'] ?? '';
+        ? (_order?['restaurant_address'] as String? ?? '')
+        : (_order?['delivery_address'] as String? ?? '');
     final phone = isPickup
-        ? _order?['restaurant_phone']
-        : _order?['customer_phone'];
+        ? (_order?['restaurant_phone'] as String?)
+        : (_order?['customer_phone'] as String?);
 
     return Container(
       margin: AppSpacing.screenHorizontal,
@@ -784,8 +784,8 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
     Navigator.pushNamed(context, AppRouter.chat, arguments: {
       'orderId': widget.orderId,
       'recipientName': _currentStep == 'pickup' 
-          ? _order?['restaurant_name'] ?? 'Restaurant'
-          : _order?['customer_name'] ?? 'Client',
+          ? (_order?['restaurant_name'] as String? ?? 'Restaurant')
+          : (_order?['customer_name'] as String? ?? 'Client'),
       'isLivreur': true,
     });
   }
