@@ -1,0 +1,37 @@
+# Configuration Koyeb pour déploiement automatique
+# Ce fichier est optionnel - Koyeb détecte automatiquement le Dockerfile
+
+name: tigzirt-backend
+type: web
+
+# Build
+build:
+  dockerfile:
+    dockerfile: Dockerfile
+
+# Runtime
+run:
+  port: 3000
+  
+# Health check
+healthChecks:
+  - port: 3000
+    path: /health
+    protocol: http
+
+# Scaling (gratuit = 1 instance)
+scaling:
+  min: 1
+  max: 1
+
+# Régions disponibles gratuitement
+regions:
+  - fra  # Frankfurt, Europe
+
+# Variables d'environnement (à configurer dans le dashboard Koyeb)
+# PORT=3000
+# NODE_ENV=production
+# SUPABASE_URL=https://xxx.supabase.co
+# SUPABASE_SERVICE_KEY=eyJxxx
+# ONESIGNAL_APP_ID=xxx
+# ONESIGNAL_API_KEY=xxx
