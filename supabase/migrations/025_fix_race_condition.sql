@@ -97,19 +97,3 @@ EXCEPTION
         );
 END;
 $$;
-
--- Révoquer l'accès direct à la mise à jour des commandes pour les livreurs
--- Ils DOIVENT passer par la fonction atomique
-CREATE POLICY "Livreurs cannot directly assign themselves" ON public.orders
-    FOR UPDATE
-    USING (
-        -- Permettre seulement si ce n'est PAS une assignation de livreur
-        -- ou si c'est fait via la fonction (SECURITY DEFINER)
-        NOT (
-            livreur_id IS NULL 
-            AND (SELECT role FROM profiles WHERE id = auth.uid()) = 'livreur'
-        )
-    );
-
--- Accorder l'exécution de la fonction aux utilisateurs authentifiés
-GRANT EXECUTE ON FUNCTION accept_order_atomic TO authenticated;
