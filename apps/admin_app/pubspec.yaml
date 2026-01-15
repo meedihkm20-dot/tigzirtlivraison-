@@ -18,6 +18,8 @@ dependencies:
   fl_chart: ^0.69.2
   cupertino_icons: ^1.0.8
   data_table_2: ^2.5.15
+  # Push notifications OneSignal (GRATUIT)
+  onesignal_flutter: ^5.2.6
 
 dev_dependencies:
   flutter_test:

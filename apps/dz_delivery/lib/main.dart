@@ -6,6 +6,7 @@ import 'core/design_system/theme/app_theme_v2.dart';
 import 'core/router/app_router.dart';
 import 'core/services/supabase_service.dart';
 import 'core/services/preferences_service.dart';
+import 'core/services/onesignal_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +17,9 @@ void main() async {
   await Hive.openBox('settings');
   await Hive.openBox('cart');
   await PreferencesService.init();
+  
+  // ✅ Initialiser OneSignal pour les notifications push
+  await OneSignalService.initialize();
   
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

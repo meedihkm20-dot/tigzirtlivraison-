@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'onesignal_service.dart';
 
 /// Service Supabase centralisé pour l'app DZ Delivery (multi-rôle)
 class SupabaseService {
@@ -9,6 +10,9 @@ class SupabaseService {
   
   static const String supabaseUrl = 'https://pauqmhqriyjdqctvfvtt.supabase.co';
   static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdXFtaHFyaXlqZHFjdHZmdnR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNTgxNzksImV4cCI6MjA4MzgzNDE3OX0.ZdhrCmf465g2-dHf1DUMJ5GlR9t-kZnPvo7uvvoA0x8';
+
+  /// ID de l'utilisateur connecté
+  static String? get currentUserId => currentUser?.id;
 
   static Future<void> init() async {
     await Supabase.initialize(
@@ -90,6 +94,8 @@ class SupabaseService {
   }
 
   static Future<void> signOut() async {
+    // ✅ Déconnecter de OneSignal avant Supabase
+    await OneSignalService.logout();
     await client.auth.signOut();
   }
 

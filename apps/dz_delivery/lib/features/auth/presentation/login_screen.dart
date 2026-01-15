@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/services/onesignal_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -41,6 +42,12 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _errorMessage = 'Profil utilisateur introuvable. Contactez l\'administrateur.');
         await SupabaseService.signOut();
         return;
+      }
+
+      // ✅ Lier l'utilisateur à OneSignal pour les notifications push
+      final userId = SupabaseService.currentUserId;
+      if (userId != null) {
+        await OneSignalService.login(userId, role: role);
       }
       
       switch (role) {

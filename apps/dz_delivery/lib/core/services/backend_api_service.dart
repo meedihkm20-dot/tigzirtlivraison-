@@ -4,8 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service pour communiquer avec le backend NestJS (Koyeb)
 class BackendApiService {
-  // ⚠️ REMPLACER par ton URL Koyeb après déploiement
-  static const String baseUrl = 'https://tigzirt-backend.koyeb.app';
+  // ✅ Backend Koyeb déployé
+  static const String baseUrl = 'https://angry-bertha-1tigizrtlivraison1-86549eb3.koyeb.app';
 
   final SupabaseClient _supabase;
 
