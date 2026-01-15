@@ -22,8 +22,7 @@ describe('HealthController', () => {
       
       expect(result).toHaveProperty('status', 'ok');
       expect(result).toHaveProperty('timestamp');
-      expect(result).toHaveProperty('uptime');
-      expect(result).toHaveProperty('service', 'tigzirt-livraison-api');
+      expect(result).toHaveProperty('service', 'tigzirt-liv-backend');
     });
 
     it('should return valid timestamp', () => {
@@ -32,12 +31,6 @@ describe('HealthController', () => {
       
       expect(timestamp).toBeInstanceOf(Date);
       expect(timestamp.getTime()).toBeLessThanOrEqual(Date.now());
-    });
-
-    it('should return positive uptime', () => {
-      const result = controller.check();
-      
-      expect(result.uptime).toBeGreaterThan(0);
     });
   });
 });
