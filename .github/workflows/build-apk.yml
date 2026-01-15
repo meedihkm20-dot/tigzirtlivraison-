@@ -6,6 +6,32 @@ on:
   workflow_dispatch:
 
 jobs:
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+      
+      - name: Run tests
+        working-directory: backend
+        run: npm test
+      
+      - name: Run E2E tests
+        working-directory: backend
+        run: npm run test:e2e
+
   build-dz-delivery:
     name: Build DZ Delivery APK
     runs-on: ubuntu-latest
