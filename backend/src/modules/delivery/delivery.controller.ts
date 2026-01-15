@@ -1,6 +1,9 @@
-import { Controller, Post, Body, Get, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Controller, Post, Body, Get, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DeliveryService } from './delivery.service';
+import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { VerifyDeliveryDto } from './dto/verify-delivery.dto';
 
 @ApiTags('Delivery')
 @Controller('api/delivery')
@@ -38,5 +41,16 @@ export class DeliveryController {
   async assignDriver(@Body() body: { order_id: string }) {
     const driver = await this.deliveryService.assignDriver(body.order_id);
     return { success: !!driver, driver };
+  }
+
+  @Post('verify')
+  @UseGuards(SupabaseAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Vérifier code et finaliser livraison' })
+  async verifyDelivery(
+    @CurrentUser() user: any,
+    @Body() dto: VerifyDeliveryDto,
+  ) {
+    return this.deliveryService.verifyDelivery(user.id, dto);
   }
 }

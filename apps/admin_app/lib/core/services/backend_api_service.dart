@@ -105,4 +105,43 @@ class BackendApiService {
       if (reason != null) 'reason': reason,
     });
   }
+
+  // ═══════════════════════════════════════════════
+  // ORDER STATUS ENDPOINTS (Migration Edge Functions)
+  // ═══════════════════════════════════════════════
+
+  /// Changer le statut d'une commande (transitions validées côté serveur)
+  Future<Map<String, dynamic>> changeOrderStatus(
+    String orderId,
+    String status, {
+    String? note,
+  }) async {
+    return post('/api/orders/$orderId/status', {
+      'status': status,
+      if (note != null) 'note': note,
+    });
+  }
+
+  /// Annuler une commande
+  Future<Map<String, dynamic>> cancelOrder(
+    String orderId,
+    String reason, {
+    String? details,
+  }) async {
+    return post('/api/orders/$orderId/cancel', {
+      'reason': reason,
+      if (details != null) 'details': details,
+    });
+  }
+
+  /// Vérifier le code de confirmation et finaliser la livraison
+  Future<Map<String, dynamic>> verifyDelivery(
+    String orderId,
+    String verificationCode,
+  ) async {
+    return post('/api/delivery/verify', {
+      'order_id': orderId,
+      'verification_code': verificationCode,
+    });
+  }
 }
