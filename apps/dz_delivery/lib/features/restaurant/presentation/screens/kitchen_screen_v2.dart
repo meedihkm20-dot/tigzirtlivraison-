@@ -7,6 +7,7 @@ import '../../../../core/design_system/theme/app_typography.dart';
 import '../../../../core/design_system/theme/app_spacing.dart';
 import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/services/backend_api_service.dart';
 
 /// Écran Cuisine Premium V2
 /// Vue en grille avec priorités visuelles, sons et animations

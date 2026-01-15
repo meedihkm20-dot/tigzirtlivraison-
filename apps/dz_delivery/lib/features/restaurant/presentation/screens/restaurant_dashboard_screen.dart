@@ -8,6 +8,7 @@ import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/design_system/components/cards/stat_card.dart';
 import '../../../../core/design_system/components/cards/order_card.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/services/backend_api_service.dart';
 import '../../../../core/router/app_router.dart';
 
 class RestaurantDashboardScreen extends StatefulWidget {

@@ -7,6 +7,7 @@ import '../../../../core/design_system/theme/app_spacing.dart';
 import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/design_system/components/loaders/skeleton_loader.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/services/backend_api_service.dart';
 import '../../../../core/router/app_router.dart';
 
 /// Écran Panier V2 - Premium
