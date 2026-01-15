@@ -147,7 +147,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Commandes en cours', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        TextButton(onPressed: () {}, child: const Text('Voir tout')),
+                        TextButton(
+                          onPressed: () => Navigator.pushNamed(context, AppRouter.ordersHistory),
+                          child: const Text('Historique'),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service Supabase centralisé pour l'app Livreur
@@ -358,8 +359,6 @@ class SupabaseService {
       'deliveries': allDeliveries.length,
     };
   }
-}
-
 
   // ============================================
   // VÉRIFICATION CODE SÉCURISÉE
@@ -403,3 +402,4 @@ class SupabaseService {
       };
     }
   }
+}

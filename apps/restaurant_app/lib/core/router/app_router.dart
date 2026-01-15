@@ -5,6 +5,7 @@ import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/pending_approval_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/orders/presentation/order_detail_screen.dart';
+import '../../features/orders/presentation/orders_history_screen.dart';
 import '../../features/menu/presentation/menu_screen.dart';
 import '../../features/menu/presentation/add_item_screen.dart';
 import '../../features/stats/presentation/stats_screen.dart';
@@ -17,6 +18,7 @@ class AppRouter {
   static const String pendingApproval = '/pending-approval';
   static const String home = '/home';
   static const String orderDetail = '/order-detail';
+  static const String ordersHistory = '/orders-history';
   static const String menu = '/menu';
   static const String addItem = '/add-item';
   static const String stats = '/stats';
@@ -37,6 +39,8 @@ class AppRouter {
       case orderDetail:
         final orderId = settings.arguments as String;
         return MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: orderId));
+      case ordersHistory:
+        return MaterialPageRoute(builder: (_) => const OrdersHistoryScreen());
       case menu:
         return MaterialPageRoute(builder: (_) => const MenuScreen());
       case addItem:
