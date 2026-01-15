@@ -129,7 +129,6 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
   void _updateLocationOnServer() async {
     if (_currentPosition == null) return;
     await SupabaseService.updateLivreurLocation(
-      widget.orderId,
       _currentPosition!.latitude,
       _currentPosition!.longitude,
     );
@@ -147,7 +146,7 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
       
       if (mounted) {
         setState(() {
-          _routePoints = route;
+          _routePoints = List<LatLng>.from(route);
           _etaMinutes = routeInfo['duration'] ?? 0;
           _distanceKm = routeInfo['distance'] ?? 0;
           _nextInstruction = routeInfo['instruction'] ?? 'Continuez tout droit';

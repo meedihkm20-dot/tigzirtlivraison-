@@ -179,7 +179,7 @@ class _IncidentCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF1B2838),
           borderRadius: BorderRadius.circular(16),
-          border: Border.left(color: priorityColor, width: 4),
+          border: Border(left: BorderSide(color: priorityColor, width: 4)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

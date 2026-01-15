@@ -1412,13 +1412,25 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
     HapticFeedback.heavyImpact();
 
     try {
-      final orderId = await SupabaseService.createOrder(
+      // Calculate totals
+      final subtotal = _cartItems.fold<double>(0, (sum, item) => 
+        sum + ((item['price'] as num).toDouble() * (item['quantity'] as int)));
+      final deliveryFee = _deliveryFee - _promoDiscount;
+      final tip = _tipAmount;
+      final total = subtotal + deliveryFee + tip;
+      
+      final restaurantId = _cartItems.isNotEmpty ? _cartItems.first['restaurant_id'] : '';
+      
+      final orderResponse = await SupabaseService.createOrder(
+        restaurantId: restaurantId,
         items: _cartItems,
-        addressId: _selectedAddress!['id'],
-        tip: _tipAmount,
-        promoCode: _promoCode,
-        note: _orderNote,
-        scheduledTime: _scheduledTime,
+        deliveryAddress: _selectedAddress!['address'] ?? '',
+        deliveryLat: (_selectedAddress!['lat'] as num?)?.toDouble() ?? 0,
+        deliveryLng: (_selectedAddress!['lng'] as num?)?.toDouble() ?? 0,
+        deliveryInstructions: _orderNote,
+        subtotal: subtotal,
+        deliveryFee: deliveryFee,
+        total: total,
         paymentMethod: _paymentMethod,
       );
 
@@ -1428,7 +1440,7 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
         Navigator.pushReplacementNamed(
           context,
           AppRouter.orderTracking,
-          arguments: orderId,
+          arguments: orderResponse['id'],
         );
       }
     } catch (e) {

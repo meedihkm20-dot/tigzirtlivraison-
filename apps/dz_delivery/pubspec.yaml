@@ -30,8 +30,11 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
   location: ^7.0.0
+  geolocator: ^13.0.2
   flutter_tts: ^4.2.0
   permission_handler: ^11.3.1
+  # Audio pour notifications
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -43,3 +46,4 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/sounds/

@@ -113,9 +113,7 @@ class SupabaseService {
     String? action,
   }) async {
     var query = client.from('admin_audit_logs')
-        .select('*, admin:profiles!admin_id(full_name)')
-        .order('created_at', ascending: false)
-        .limit(limit);
+        .select('*, admin:profiles!admin_id(full_name)');
     
     if (entityType != null) {
       query = query.eq('entity_type', entityType);
@@ -124,7 +122,7 @@ class SupabaseService {
       query = query.eq('action', action);
     }
     
-    final response = await query;
+    final response = await query.order('created_at', ascending: false).limit(limit);
     return List<Map<String, dynamic>>.from(response);
   }
 
@@ -531,14 +529,12 @@ class SupabaseService {
     int limit = 50,
   }) async {
     var query = client.from('incidents')
-        .select('*, order:orders(order_number), assigned:profiles!assigned_to(full_name)')
-        .order('created_at', ascending: false)
-        .limit(limit);
+        .select('*, order:orders(order_number), assigned:profiles!assigned_to(full_name)');
 
     if (status != null) query = query.eq('status', status);
     if (priority != null) query = query.eq('priority', priority);
 
-    final response = await query;
+    final response = await query.order('created_at', ascending: false).limit(limit);
     return List<Map<String, dynamic>>.from(response);
   }
 

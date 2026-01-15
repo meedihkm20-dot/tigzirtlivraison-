@@ -666,18 +666,6 @@ class SupabaseService {
     return {'total': total, 'today': today, 'week': week, 'deliveries': allDeliveries.length};
   }
 
-  /// Récupérer les transactions du livreur
-  static Future<List<Map<String, dynamic>>> getLivreurTransactions() async {
-    if (currentUser == null) return [];
-    final response = await client.from('transactions')
-        .select('*, order:orders(order_number)')
-        .eq('recipient_id', currentUser!.id)
-        .eq('type', 'livreur_earning')
-        .order('created_at', ascending: false)
-        .limit(50);
-    return List<Map<String, dynamic>>.from(response);
-  }
-
   // ============================================
   // REALTIME - NOUVEAU FLUX
   // ============================================
@@ -950,15 +938,6 @@ class SupabaseService {
   // ============================================
   // LIVREUR - BADGES ET STATS
   // ============================================
-
-  static Future<List<Map<String, dynamic>>> getLivreurBadges() async {
-    final livreur = await getLivreurProfile();
-    if (livreur == null) return [];
-    
-    final response = await client.from('livreur_badges')
-        .select().eq('livreur_id', livreur['id']).order('earned_at', ascending: false);
-    return List<Map<String, dynamic>>.from(response);
-  }
 
   static Future<Map<String, dynamic>> getLivreurDetailedStats() async {
     final livreur = await getLivreurProfile();

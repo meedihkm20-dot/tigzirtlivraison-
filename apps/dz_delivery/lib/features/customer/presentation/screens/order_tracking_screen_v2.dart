@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
 import '../../../../core/design_system/theme/app_spacing.dart';
@@ -35,8 +36,8 @@ class _OrderTrackingScreenV2State extends State<OrderTrackingScreenV2>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   
-  StreamSubscription? _orderSubscription;
-  StreamSubscription? _locationSubscription;
+  RealtimeChannel? _orderChannel;
+  RealtimeChannel? _locationChannel;
   Timer? _etaTimer;
   
   int _estimatedMinutes = 0;
@@ -68,8 +69,8 @@ class _OrderTrackingScreenV2State extends State<OrderTrackingScreenV2>
   @override
   void dispose() {
     _pulseController.dispose();
-    _orderSubscription?.cancel();
-    _locationSubscription?.cancel();
+    _orderChannel?.unsubscribe();
+    _locationChannel?.unsubscribe();
     _etaTimer?.cancel();
     super.dispose();
   }
@@ -125,9 +126,9 @@ class _OrderTrackingScreenV2State extends State<OrderTrackingScreenV2>
   }
 
   void _subscribeToUpdates() {
-    // Subscribe to order status updates
-    _orderSubscription = SupabaseService.subscribeToOrder(widget.orderId).listen((update) {
-      if (mounted && update != null) {
+    // Subscribe to order status updates using RealtimeChannel
+    _orderChannel = SupabaseService.subscribeToOrder(widget.orderId, (update) {
+      if (mounted && update.isNotEmpty) {
         setState(() {
           _currentStatus = update['status'] ?? _currentStatus;
           _estimatedMinutes = update['estimated_delivery_minutes'] ?? _estimatedMinutes;
@@ -136,19 +137,6 @@ class _OrderTrackingScreenV2State extends State<OrderTrackingScreenV2>
         if (_currentStatus == 'delivered') {
           _showDeliveredDialog();
         }
-      }
-    });
-    
-    // Subscribe to livreur location updates
-    _locationSubscription = SupabaseService.subscribeToLivreurLocation(widget.orderId).listen((location) {
-      if (mounted && location != null) {
-        setState(() {
-          _livreurPosition = LatLng(
-            (location['lat'] as num).toDouble(),
-            (location['lng'] as num).toDouble(),
-          );
-        });
-        _loadRoute();
       }
     });
     
@@ -169,7 +157,7 @@ class _OrderTrackingScreenV2State extends State<OrderTrackingScreenV2>
         _deliveryPosition!,
       );
       if (mounted && route.isNotEmpty) {
-        setState(() => _routePoints = route);
+        setState(() => _routePoints = List<LatLng>.from(route));
       }
     } catch (e) {
       debugPrint('Erreur chargement route: $e');
