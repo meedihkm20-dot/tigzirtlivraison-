@@ -726,16 +726,6 @@ class SupabaseService {
   }
 
   // ============================================
-  // UTILS
-  // ============================================
-
-  static Future<void> unsubscribe(RealtimeChannel channel) async {
-    await client.removeChannel(channel);
-  }
-}
-
-
-  // ============================================
   // ACTIONS D'URGENCE (CRISE)
   // ============================================
 
@@ -822,8 +812,8 @@ class SupabaseService {
         .from('livreurs')
         .select('*, user:profiles!user_id(full_name, phone)')
         .eq('is_online', true)
-        .eq('is_available', false) // Occupé mais...
-        .lt('updated_at', thirtyMinAgo.toIso8601String()); // Pas de mise à jour depuis 30 min
+        .eq('is_available', false)
+        .lt('updated_at', thirtyMinAgo.toIso8601String());
     
     return List<Map<String, dynamic>>.from(response);
   }
@@ -834,7 +824,6 @@ class SupabaseService {
     required String title,
     required String body,
   }) async {
-    // Récupérer le FCM token
     final tokens = await client
         .from('fcm_tokens')
         .select('token')
@@ -842,7 +831,6 @@ class SupabaseService {
     
     if (tokens.isEmpty) return;
     
-    // Créer une notification en base (sera envoyée par le backend)
     await client.from('notifications').insert({
       'user_id': userId,
       'title': title,
@@ -850,3 +838,12 @@ class SupabaseService {
       'notification_type': 'admin_alert',
     });
   }
+
+  // ============================================
+  // UTILS
+  // ============================================
+
+  static Future<void> unsubscribe(RealtimeChannel channel) async {
+    await client.removeChannel(channel);
+  }
+}
