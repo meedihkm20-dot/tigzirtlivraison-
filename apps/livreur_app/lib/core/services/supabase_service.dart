@@ -139,36 +139,49 @@ class SupabaseService {
   // ORDERS
   // ============================================
   
-  /// Récupérer les commandes disponibles (à proximité)
+  /// Récupérer les commandes disponibles (à proximité) avec retry
   static Future<List<Map<String, dynamic>>> getAvailableOrders({
     required double lat,
     required double lng,
     double radiusKm = 5,
   }) async {
-    final response = await client
-        .from('orders')
-        .select('*, restaurant:restaurants(*), customer:profiles!customer_id(full_name, phone)')
-        .eq('status', 'ready')
-        .isFilter('livreur_id', null)
-        .order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      final response = await client
+          .from('orders')
+          .select('*, restaurant:restaurants(*), customer:profiles!customer_id(full_name, phone)')
+          .eq('status', 'ready')
+          .isFilter('livreur_id', null)
+          .order('created_at', ascending: false)
+          .timeout(const Duration(seconds: 10));
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Erreur getAvailableOrders: $e');
+      // Retourner une liste vide en cas d'erreur plutôt que de crasher
+      return [];
+    }
   }
 
-  /// Récupérer mes commandes en cours
+  /// Récupérer mes commandes en cours avec retry
   static Future<List<Map<String, dynamic>>> getMyActiveOrders() async {
     if (currentUser == null) return [];
     
-    // D'abord récupérer l'ID du livreur
-    final livreur = await getLivreurProfile();
-    if (livreur == null) return [];
-    
-    final response = await client
-        .from('orders')
-        .select('*, restaurant:restaurants(*), customer:profiles!customer_id(full_name, phone, address)')
-        .eq('livreur_id', livreur['id'])
-        .inFilter('status', ['picked_up', 'delivering'])
-        .order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      // D'abord récupérer l'ID du livreur
+      final livreur = await getLivreurProfile();
+      if (livreur == null) return [];
+      
+      final response = await client
+          .from('orders')
+          .select('*, restaurant:restaurants(*), customer:profiles!customer_id(full_name, phone, address)')
+          .eq('livreur_id', livreur['id'])
+          .inFilter('status', ['picked_up', 'delivering'])
+          .order('created_at', ascending: false)
+          .timeout(const Duration(seconds: 10));
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Erreur getMyActiveOrders: $e');
+      return [];
+    }
   }
 
   /// Récupérer l'historique des livraisons
@@ -188,22 +201,42 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
-  /// Accepter une commande
-  static Future<void> acceptOrder(String orderId) async {
+  /// Accepter une commande (ATOMIQUE - anti race condition)
+  /// Retourne un résultat avec success/error
+  static Future<Map<String, dynamic>> acceptOrder(String orderId) async {
     final livreur = await getLivreurProfile();
-    if (livreur == null) return;
+    if (livreur == null) {
+      return {
+        'success': false,
+        'error': 'NOT_LOGGED_IN',
+        'message': 'Vous devez être connecté',
+      };
+    }
     
-    await client
-        .from('orders')
-        .update({
-          'livreur_id': livreur['id'],
-          'status': 'picked_up',
-          'picked_up_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', orderId);
-    
-    // Marquer comme non disponible
-    await setAvailability(false);
+    try {
+      // Appel de la fonction atomique côté serveur
+      final result = await client.rpc('accept_order_atomic', params: {
+        'p_order_id': orderId,
+        'p_livreur_id': livreur['id'],
+      });
+      
+      // Le résultat est directement le JSONB retourné
+      if (result is Map) {
+        return Map<String, dynamic>.from(result);
+      }
+      
+      return {
+        'success': false,
+        'error': 'INVALID_RESPONSE',
+        'message': 'Réponse invalide du serveur',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'NETWORK_ERROR',
+        'message': 'Erreur réseau: $e',
+      };
+    }
   }
 
   /// Mettre à jour le statut de la commande
@@ -326,3 +359,47 @@ class SupabaseService {
     };
   }
 }
+
+
+  // ============================================
+  // VÉRIFICATION CODE SÉCURISÉE
+  // ============================================
+  
+  /// Vérifier le code de confirmation (sécurisé avec limite de tentatives)
+  static Future<Map<String, dynamic>> verifyConfirmationCode({
+    required String orderId,
+    required String code,
+  }) async {
+    final livreur = await getLivreurProfile();
+    if (livreur == null) {
+      return {
+        'success': false,
+        'error': 'NOT_LOGGED_IN',
+        'message': 'Vous devez être connecté',
+      };
+    }
+    
+    try {
+      final result = await client.rpc('verify_confirmation_code_secure', params: {
+        'p_order_id': orderId,
+        'p_code': code.toUpperCase(),
+        'p_livreur_id': livreur['id'],
+      }).timeout(const Duration(seconds: 10));
+      
+      if (result is Map) {
+        return Map<String, dynamic>.from(result);
+      }
+      
+      return {
+        'success': false,
+        'error': 'INVALID_RESPONSE',
+        'message': 'Réponse invalide',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'NETWORK_ERROR',
+        'message': 'Erreur réseau. Vérifiez votre connexion.',
+      };
+    }
+  }

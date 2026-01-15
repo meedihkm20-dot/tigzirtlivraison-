@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/cart_service.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -8,20 +9,61 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  final List<Map<String, dynamic>> _cartItems = [
-    {'name': 'Pizza Margherita', 'price': 800, 'quantity': 1},
-    {'name': 'Burger Classic', 'price': 500, 'quantity': 2},
-    {'name': 'Coca Cola', 'price': 150, 'quantity': 2},
-  ];
+  List<Map<String, dynamic>> _cartItems = [];
+  Map<String, dynamic>? _restaurant;
 
-  int get _subtotal => _cartItems.fold(0, (sum, item) => sum + (item['price'] as int) * (item['quantity'] as int));
-  int get _deliveryFee => 200;
-  int get _total => _subtotal + _deliveryFee;
+  @override
+  void initState() {
+    super.initState();
+    _loadCart();
+  }
+
+  void _loadCart() {
+    setState(() {
+      _cartItems = CartService.getItems();
+      _restaurant = CartService.getRestaurant();
+    });
+  }
+
+  double get _subtotal => CartService.getSubtotal();
+  int get _deliveryFee => 200; // TODO: Calculer dynamiquement
+  double get _total => _subtotal + _deliveryFee;
+
+  Future<void> _updateQuantity(String itemId, int delta) async {
+    final item = _cartItems.firstWhere((e) => e['id'] == itemId);
+    final newQty = (item['quantity'] as int) + delta;
+    await CartService.updateQuantity(itemId, newQty);
+    _loadCart();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Mon Panier')),
+      appBar: AppBar(
+        title: const Text('Mon Panier'),
+        actions: [
+          if (_cartItems.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Vider le panier?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Vider', style: TextStyle(color: Colors.red))),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  await CartService.clear();
+                  _loadCart();
+                }
+              },
+            ),
+        ],
+      ),
       body: _cartItems.isEmpty
           ? const Center(
               child: Column(
@@ -35,6 +77,19 @@ class _CartScreenState extends State<CartScreen> {
             )
           : Column(
               children: [
+                // Restaurant info
+                if (_restaurant != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    color: Colors.grey[100],
+                    child: Row(
+                      children: [
+                        const Icon(Icons.restaurant, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Text(_restaurant!['name'] ?? 'Restaurant', style: const TextStyle(fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ),
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
@@ -50,10 +105,10 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                   child: Column(
                     children: [
-                      _buildPriceRow('Sous-total', '$_subtotal DA'),
+                      _buildPriceRow('Sous-total', '${_subtotal.toStringAsFixed(0)} DA'),
                       _buildPriceRow('Livraison', '$_deliveryFee DA'),
                       const Divider(),
-                      _buildPriceRow('Total', '$_total DA', isBold: true),
+                      _buildPriceRow('Total', '${_total.toStringAsFixed(0)} DA', isBold: true),
                       const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
@@ -85,15 +140,21 @@ class _CartScreenState extends State<CartScreen> {
           Container(
             width: 60,
             height: 60,
-            decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
-            child: const Icon(Icons.fastfood, color: Colors.grey),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+              image: item['image_url'] != null
+                  ? DecorationImage(image: NetworkImage(item['image_url']), fit: BoxFit.cover)
+                  : null,
+            ),
+            child: item['image_url'] == null ? const Icon(Icons.fastfood, color: Colors.grey) : null,
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(item['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
                 Text('${item['price']} DA', style: const TextStyle(color: Color(0xFFFF6B35))),
               ],
             ),
@@ -102,20 +163,12 @@ class _CartScreenState extends State<CartScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.remove_circle_outline),
-                onPressed: () {
-                  setState(() {
-                    if (item['quantity'] > 1) {
-                      item['quantity']--;
-                    } else {
-                      _cartItems.removeAt(index);
-                    }
-                  });
-                },
+                onPressed: () => _updateQuantity(item['id'], -1),
               ),
               Text('${item['quantity']}', style: const TextStyle(fontWeight: FontWeight.bold)),
               IconButton(
                 icon: const Icon(Icons.add_circle_outline),
-                onPressed: () => setState(() => item['quantity']++),
+                onPressed: () => _updateQuantity(item['id'], 1),
               ),
             ],
           ),
@@ -142,12 +195,15 @@ class _CartScreenState extends State<CartScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmer la commande'),
-        content: Text('Total: $_total DA\n\nVoulez-vous confirmer votre commande?'),
+        content: Text('Total: ${_total.toStringAsFixed(0)} DA\n\nVoulez-vous confirmer votre commande?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
+              // TODO: Créer la commande via SupabaseService
+              await CartService.clear();
+              _loadCart();
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Commande confirmée!')));
             },
             child: const Text('Confirmer'),

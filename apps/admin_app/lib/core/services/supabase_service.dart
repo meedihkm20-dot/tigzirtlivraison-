@@ -733,3 +733,120 @@ class SupabaseService {
     await client.removeChannel(channel);
   }
 }
+
+
+  // ============================================
+  // ACTIONS D'URGENCE (CRISE)
+  // ============================================
+
+  /// Forcer la libération d'un livreur bloqué
+  static Future<bool> forceReleaseLivreur(String livreurId, String reason) async {
+    try {
+      await client.from('livreurs').update({
+        'is_available': true,
+        'is_online': true,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', livreurId);
+
+      await logAction(
+        action: 'force_release_livreur',
+        entityType: 'livreur',
+        entityId: livreurId,
+        reason: reason,
+      );
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Débloquer le code de confirmation d'une commande
+  static Future<bool> unblockConfirmationCode(String orderId) async {
+    try {
+      final result = await client.rpc('admin_unblock_code', params: {
+        'p_order_id': orderId,
+        'p_admin_id': currentUser?.id,
+      });
+      return result == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Forcer le statut "livré" (cas extrême)
+  static Future<bool> forceDelivered(String orderId, String reason) async {
+    try {
+      await client.from('orders').update({
+        'status': 'delivered',
+        'delivered_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', orderId);
+
+      // Libérer le livreur
+      final order = await client.from('orders').select('livreur_id').eq('id', orderId).single();
+      if (order['livreur_id'] != null) {
+        await client.from('livreurs').update({'is_available': true}).eq('id', order['livreur_id']);
+      }
+
+      await logAction(
+        action: 'force_delivered',
+        entityType: 'order',
+        entityId: orderId,
+        reason: reason,
+      );
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Récupérer les commandes bloquées (en cours depuis trop longtemps)
+  static Future<List<Map<String, dynamic>>> getStuckOrders() async {
+    final oneHourAgo = DateTime.now().subtract(const Duration(hours: 1));
+    
+    final response = await client
+        .from('orders')
+        .select('*, restaurant:restaurants(name), livreur:livreurs(user:profiles!user_id(full_name, phone))')
+        .inFilter('status', ['pending', 'confirmed', 'preparing', 'ready', 'picked_up', 'delivering'])
+        .lt('created_at', oneHourAgo.toIso8601String())
+        .order('created_at', ascending: true);
+    
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  /// Récupérer les livreurs inactifs (en ligne mais pas de mouvement)
+  static Future<List<Map<String, dynamic>>> getInactiveLivreurs() async {
+    final thirtyMinAgo = DateTime.now().subtract(const Duration(minutes: 30));
+    
+    final response = await client
+        .from('livreurs')
+        .select('*, user:profiles!user_id(full_name, phone)')
+        .eq('is_online', true)
+        .eq('is_available', false) // Occupé mais...
+        .lt('updated_at', thirtyMinAgo.toIso8601String()); // Pas de mise à jour depuis 30 min
+    
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  /// Envoyer une notification push à un utilisateur
+  static Future<void> sendPushNotification({
+    required String userId,
+    required String title,
+    required String body,
+  }) async {
+    // Récupérer le FCM token
+    final tokens = await client
+        .from('fcm_tokens')
+        .select('token')
+        .eq('user_id', userId);
+    
+    if (tokens.isEmpty) return;
+    
+    // Créer une notification en base (sera envoyée par le backend)
+    await client.from('notifications').insert({
+      'user_id': userId,
+      'title': title,
+      'body': body,
+      'notification_type': 'admin_alert',
+    });
+  }

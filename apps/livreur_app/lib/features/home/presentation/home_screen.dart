@@ -65,16 +65,40 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _acceptOrder(String orderId) async {
-    try {
-      await SupabaseService.acceptOrder(orderId);
+    // Afficher un loader
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+    
+    final result = await SupabaseService.acceptOrder(orderId);
+    
+    // Fermer le loader
+    if (mounted) Navigator.of(context).pop();
+    
+    if (result['success'] == true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Commande acceptée!'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text('✅ ${result['message'] ?? 'Commande acceptée!'}'),
+          backgroundColor: Colors.green,
+        ),
       );
       Navigator.pushNamed(context, AppRouter.orderDetail, arguments: orderId);
       _loadOrders();
-    } catch (e) {
+    } else {
+      // Gérer les différents cas d'erreur
+      String message = result['message'] ?? 'Erreur inconnue';
+      Color bgColor = Colors.red;
+      
+      if (result['error'] == 'ORDER_ALREADY_TAKEN') {
+        message = '⚠️ Trop tard! Un autre livreur a pris cette commande';
+        bgColor = Colors.orange;
+        _loadOrders(); // Rafraîchir la liste
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text(message), backgroundColor: bgColor, duration: const Duration(seconds: 4)),
       );
     }
   }

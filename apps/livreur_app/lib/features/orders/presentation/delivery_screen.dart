@@ -293,25 +293,33 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 const SizedBox(height: 16),
                 _buildDestinationCard(),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _openExternalNavigation,
-                        icon: const Icon(Icons.navigation),
-                        label: const Text('GPS'),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _openExternalNavigation,
+                            icon: const Icon(Icons.navigation),
+                            label: const Text('GPS'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Bouton problème
+                        OutlinedButton.icon(
+                          onPressed: _reportProblem,
+                          style: OutlinedButton.styleFrom(foregroundColor: Colors.orange),
+                          icon: const Icon(Icons.warning_amber),
+                          label: const Text('Problème'),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: _nextStep,
+                            child: Text(_currentStep < _steps.length - 1 ? _steps[_currentStep + 1] : 'Confirmer'),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton(
-                        onPressed: _nextStep,
-                        child: Text(_currentStep < _steps.length - 1 ? _steps[_currentStep + 1] : 'Confirmer'),
-                      ),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
@@ -451,6 +459,57 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           ],
         ),
         actions: [SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pushNamedAndRemoveUntil(context, AppRouter.home, (route) => false), child: const Text('Retour')))],
+      ),
+    );
+  }
+
+  /// Signaler un problème
+  void _reportProblem() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Signaler un problème', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            _buildProblemOption(Icons.location_off, 'Adresse introuvable', 'address_not_found'),
+            _buildProblemOption(Icons.person_off, 'Client injoignable', 'client_unreachable'),
+            _buildProblemOption(Icons.restaurant, 'Problème restaurant', 'restaurant_issue'),
+            _buildProblemOption(Icons.car_crash, 'Problème véhicule', 'vehicle_issue'),
+            _buildProblemOption(Icons.help_outline, 'Autre problème', 'other'),
+            const SizedBox(height: 16),
+            const Text('Un admin sera notifié et vous contactera.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProblemOption(IconData icon, String label, String type) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.orange),
+      title: Text(label),
+      onTap: () {
+        Navigator.pop(context);
+        _submitProblem(type, label);
+      },
+    );
+  }
+
+  Future<void> _submitProblem(String type, String label) async {
+    // TODO: Envoyer à l'API pour créer un incident
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Problème signalé: $label'),
+        backgroundColor: Colors.orange,
+        action: SnackBarAction(
+          label: 'Appeler support',
+          textColor: Colors.white,
+          onPressed: () => launchUrl(Uri.parse('tel:+213555000000')),
+        ),
       ),
     );
   }

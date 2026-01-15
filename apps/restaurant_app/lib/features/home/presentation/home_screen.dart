@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/services/alert_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -63,11 +64,39 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showNewOrderNotification() {
+    // 🔊 ALERTE SONORE + VIBRATION
+    AlertService.playNewOrderAlert();
+    
+    // Afficher une notification persistante en haut de l'écran
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('🔔 Nouvelle commande reçue!'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 3),
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.notifications_active, color: Colors.white),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('🔔 NOUVELLE COMMANDE!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text('Appuyez pour voir', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.green.shade700,
+        duration: const Duration(seconds: 30), // Reste visible longtemps
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'VOIR',
+          textColor: Colors.white,
+          onPressed: () {
+            AlertService.stopAlert();
+            _loadData();
+          },
+        ),
       ),
     );
   }
@@ -241,36 +270,71 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'pending':
         return Row(
           children: [
-            Expanded(
-              child: OutlinedButton(
+            // Bouton refuser plus petit et moins visible
+            SizedBox(
+              width: 80,
+              child: TextButton(
                 onPressed: () => _cancelOrder(orderId),
-                style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Refuser'),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Refuser', style: TextStyle(fontSize: 12)),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
+            // Bouton accepter GROS et VERT
             Expanded(
-              child: ElevatedButton(
-                onPressed: () => _confirmOrder(orderId),
-                child: const Text('Confirmer'),
+              child: ElevatedButton.icon(
+                onPressed: () => _quickConfirmOrder(orderId),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                icon: const Icon(Icons.check, color: Colors.white),
+                label: const Text('ACCEPTER', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
               ),
             ),
           ],
         );
       case 'confirmed':
-        return ElevatedButton(
-          onPressed: () => _startPreparing(orderId),
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-          child: const Text('Commencer préparation'),
-        );
       case 'preparing':
-        return ElevatedButton(
-          onPressed: () => _markAsReady(orderId),
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-          child: const Text('Marquer comme prêt'),
+        // UN SEUL BOUTON: Prêt
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _markAsReady(orderId),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            icon: const Icon(Icons.done_all, color: Colors.white),
+            label: const Text('COMMANDE PRÊTE', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+          ),
         );
       default:
         return const SizedBox.shrink();
+    }
+  }
+
+  /// Confirmation rapide avec temps par défaut
+  Future<void> _quickConfirmOrder(String orderId) async {
+    // Confirmation directe avec temps par défaut (basé sur avg_prep_time du restaurant)
+    final prepTime = _restaurant?['avg_prep_time'] ?? 20;
+    
+    try {
+      await SupabaseService.confirmOrder(orderId, prepTime);
+      AlertService.playConfirmSound();
+      _loadData();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Commande acceptée! Temps estimé: $prepTime min'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 

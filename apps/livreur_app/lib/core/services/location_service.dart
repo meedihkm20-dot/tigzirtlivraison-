@@ -41,14 +41,33 @@ class LocationService {
     }
   }
 
-  /// Stream de position en temps réel (mise à jour tous les 10m)
-  static Stream<LocationData> getLocationStream() {
+  /// Stream de position en temps réel (optimisé batterie)
+  /// Mise à jour tous les 5 secondes OU 20 mètres de déplacement
+  static Stream<LocationData> getLocationStream({bool highAccuracy = false}) {
     _location.changeSettings(
-      accuracy: LocationAccuracy.high,
-      interval: 1000, // 1 seconde
-      distanceFilter: 10, // 10 mètres
+      accuracy: highAccuracy ? LocationAccuracy.high : LocationAccuracy.balanced,
+      interval: 5000, // 5 secondes (au lieu de 1)
+      distanceFilter: 20, // 20 mètres (au lieu de 10)
     );
     return _location.onLocationChanged;
+  }
+
+  /// Mode économie de batterie (pour quand le livreur attend)
+  static void setLowPowerMode() {
+    _location.changeSettings(
+      accuracy: LocationAccuracy.low,
+      interval: 30000, // 30 secondes
+      distanceFilter: 100, // 100 mètres
+    );
+  }
+
+  /// Mode haute précision (pour la navigation active)
+  static void setHighAccuracyMode() {
+    _location.changeSettings(
+      accuracy: LocationAccuracy.high,
+      interval: 3000, // 3 secondes
+      distanceFilter: 10, // 10 mètres
+    );
   }
 
   /// Active le mode background pour le suivi continu
