@@ -72,35 +72,29 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> with Si
     );
   }
 
-  void _addToCart(Map<String, dynamic> item) {
+  void _addToCart(Map<String, dynamic> item) async {
     final itemId = item['id'] as String;
-    setState(() {
-      _cart[itemId] = (_cart[itemId] ?? 0) + 1;
-    });
     
-    // Sauvegarder dans Hive
-    final cartBox = Hive.box('cart');
-    final cartItems = List<Map<String, dynamic>>.from(cartBox.get('items', defaultValue: []));
-    final existingIndex = cartItems.indexWhere((i) => i['id'] == itemId);
-    
-    if (existingIndex >= 0) {
-      cartItems[existingIndex]['quantity'] = (cartItems[existingIndex]['quantity'] ?? 1) + 1;
-    } else {
-      cartItems.add({
-        'id': itemId,
-        'name': item['name'],
-        'price': item['price'],
-        'quantity': 1,
-        'restaurant_id': widget.restaurantId,
-        'restaurant_name': _restaurant?['name'],
+    try {
+      // Ajouter à Supabase
+      await SupabaseService.addToCart(itemId, 1);
+      
+      setState(() {
+        _cart[itemId] = (_cart[itemId] ?? 0) + 1;
       });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${item['name']} ajouté au panier'), duration: const Duration(seconds: 1)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), duration: const Duration(seconds: 2)),
+        );
+      }
     }
-    cartBox.put('items', cartItems);
-    cartBox.put('restaurant_id', widget.restaurantId);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${item['name']} ajouté au panier'), duration: const Duration(seconds: 1)),
-    );
   }
 
   int get _totalItems => _cart.values.fold(0, (sum, qty) => sum + qty);
