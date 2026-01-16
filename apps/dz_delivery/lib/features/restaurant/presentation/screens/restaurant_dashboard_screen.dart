@@ -8,6 +8,7 @@ import '../../../../core/design_system/theme/app_spacing.dart';
 import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/design_system/components/cards/stat_card.dart';
 import '../../../../core/design_system/components/cards/order_card.dart';
+import '../../../../core/design_system/utils/order_status_helper.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/backend_api_service.dart';
 import '../../../../core/router/app_router.dart';
@@ -525,7 +526,7 @@ class _RestaurantDashboardScreenState extends ConsumerState<RestaurantDashboardS
                 icon: Icons.bar_chart,
                 label: 'Stats',
                 color: AppColors.info,
-                onTap: () => Navigator.pushNamed(context, AppRouter.statsV2),
+                onTap: () => Navigator.pushNamed(context, AppRouter.stats),
               ),
             ),
             AppSpacing.hMd,
@@ -703,7 +704,7 @@ class _RestaurantDashboardScreenState extends ConsumerState<RestaurantDashboardS
           AppSpacing.vMd,
           ...pendingOrders.take(3).map((order) {
             final status = order['status'] as String? ?? '';
-            final statusInfo = _getStatusInfo(status);
+            final statusInfo = OrderStatusHelper.getInfo(status);
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
@@ -945,21 +946,6 @@ class _RestaurantDashboardScreenState extends ConsumerState<RestaurantDashboardS
     }
   }
 
-  _StatusInfo _getStatusInfo(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return _StatusInfo('Nouvelle', AppColors.statusPending);
-      case 'confirmed':
-        return _StatusInfo('Confirmée', AppColors.statusConfirmed);
-      case 'preparing':
-        return _StatusInfo('En préparation', AppColors.statusPreparing);
-      case 'ready':
-        return _StatusInfo('Prête', AppColors.statusReady);
-      default:
-        return _StatusInfo(status, AppColors.textSecondary);
-    }
-  }
-
   Widget _buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
@@ -1016,10 +1002,4 @@ class _RestaurantDashboardScreenState extends ConsumerState<RestaurantDashboardS
       ),
     );
   }
-}
-
-class _StatusInfo {
-  final String label;
-  final Color color;
-  _StatusInfo(this.label, this.color);
 }

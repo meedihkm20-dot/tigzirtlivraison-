@@ -23,5 +23,6 @@ export 'components/badges/status_badge.dart';
 export 'components/buttons/action_button.dart';
 
 // Utilities
+export 'utils/order_status_helper.dart';
 // export 'utils/responsive.dart';
 // export 'utils/animations.dart';

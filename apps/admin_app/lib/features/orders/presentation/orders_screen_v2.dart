@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/order_status_helper.dart';
 
 class OrdersScreenV2 extends StatefulWidget {
   const OrdersScreenV2({super.key});
@@ -205,7 +206,7 @@ class _OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = order['status'] as String?;
-    final statusInfo = _getStatusInfo(status);
+    final statusInfo = OrderStatusHelper.getInfo(status);
 
     return GestureDetector(
       onTap: onTap,
@@ -229,12 +230,12 @@ class _OrderCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: statusInfo['color'].withOpacity(0.2),
+                    color: statusInfo.color.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    statusInfo['text'],
-                    style: TextStyle(color: statusInfo['color'], fontSize: 12, fontWeight: FontWeight.w600),
+                    statusInfo.label,
+                    style: TextStyle(color: statusInfo.color, fontSize: 12, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -298,20 +299,6 @@ class _OrderCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Map<String, dynamic> _getStatusInfo(String? status) {
-    switch (status) {
-      case 'pending': return {'text': 'En attente', 'color': Colors.orange};
-      case 'confirmed': return {'text': 'Confirmée', 'color': Colors.blue};
-      case 'preparing': return {'text': 'Préparation', 'color': Colors.purple};
-      case 'ready': return {'text': 'Prête', 'color': Colors.teal};
-      case 'picked_up': return {'text': 'Récupérée', 'color': Colors.indigo};
-      case 'delivering': return {'text': 'En livraison', 'color': Colors.blue};
-      case 'delivered': return {'text': 'Livrée', 'color': Colors.green};
-      case 'cancelled': return {'text': 'Annulée', 'color': Colors.red};
-      default: return {'text': status ?? '', 'color': Colors.grey};
-    }
   }
 
   String _formatDate(String? dateStr) {

@@ -3,6 +3,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_typography.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_shadows.dart';
+import '../../utils/order_status_helper.dart';
 
 /// Carte de commande premium pour le restaurant
 class OrderCard extends StatelessWidget {
@@ -45,7 +46,7 @@ class OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusInfo = _getStatusInfo(status);
+    final statusInfo = OrderStatusHelper.getInfo(status);
     final elapsedMinutes = DateTime.now().difference(createdAt).inMinutes;
     final priorityColor = AppColors.getPriorityColor(elapsedMinutes);
 
@@ -112,7 +113,7 @@ class OrderCard extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(_StatusInfo statusInfo, int elapsedMinutes, Color priorityColor) {
+  Widget _buildHeader(OrderStatusInfo statusInfo, int elapsedMinutes, Color priorityColor) {
     return Container(
       padding: AppSpacing.card,
       decoration: BoxDecoration(
@@ -406,32 +407,6 @@ class OrderCard extends StatelessWidget {
     return '${dateTime.day}/${dateTime.month} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 
-  _StatusInfo _getStatusInfo(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return _StatusInfo('Nouvelle', AppColors.statusPending);
-      case 'confirmed':
-        return _StatusInfo('Confirmée', AppColors.statusConfirmed);
-      case 'preparing':
-        return _StatusInfo('En préparation', AppColors.statusPreparing);
-      case 'ready':
-        return _StatusInfo('Prête', AppColors.statusReady);
-      case 'picked_up':
-        return _StatusInfo('En livraison', AppColors.statusPickedUp);
-      case 'delivered':
-        return _StatusInfo('Livrée', AppColors.statusDelivered);
-      case 'cancelled':
-        return _StatusInfo('Annulée', AppColors.statusCancelled);
-      default:
-        return _StatusInfo(status, AppColors.textSecondary);
-    }
-  }
-}
-
-class _StatusInfo {
-  final String label;
-  final Color color;
-  _StatusInfo(this.label, this.color);
 }
 
 /// Data class pour les items de commande
