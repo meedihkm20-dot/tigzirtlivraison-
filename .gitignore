@@ -47,6 +47,7 @@ coverage/
 .cache/
 .temp/
 .tmp/
+supabase/.temp/
 
 # Documentation locale (ne pas pousser sur GitHub)
 PLAN_TEST_MANUEL.md
