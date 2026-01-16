@@ -1361,24 +1361,66 @@ class _CartScreenV2State extends ConsumerState<CartScreenV2> with TickerProvider
     if (code.isEmpty) return;
     
     HapticFeedback.lightImpact();
+    setState(() => _promoError = '');
     
-    // Simulate promo validation
-    if (code == 'BIENVENUE30') {
+    try {
+      // Vérifier le code promo via Supabase
+      final promo = await SupabaseService.client
+          .from('promotions')
+          .select()
+          .eq('code', code)
+          .eq('is_active', true)
+          .eq('restaurant_id', _selectedRestaurant!['id'])
+          .maybeSingle();
+      
+      if (promo == null) {
+        setState(() => _promoError = 'Code invalide ou expiré');
+        return;
+      }
+      
+      // Vérifier la date d'expiration
+      if (promo['ends_at'] != null) {
+        final endsAt = DateTime.parse(promo['ends_at']);
+        if (endsAt.isBefore(DateTime.now())) {
+          setState(() => _promoError = 'Code expiré');
+          return;
+        }
+      }
+      
+      // Vérifier le montant minimum
+      final minAmount = (promo['min_order_amount'] as num?)?.toDouble() ?? 0;
+      if (_subtotal < minAmount) {
+        setState(() => _promoError = 'Montant minimum: ${minAmount.toStringAsFixed(0)} DA');
+        return;
+      }
+      
+      // Calculer la réduction
+      double discount = 0;
+      if (promo['discount_type'] == 'percentage') {
+        discount = _subtotal * ((promo['discount_value'] as num).toDouble() / 100);
+        final maxDiscount = (promo['max_discount'] as num?)?.toDouble();
+        if (maxDiscount != null && discount > maxDiscount) {
+          discount = maxDiscount;
+        }
+      } else {
+        discount = (promo['discount_value'] as num).toDouble();
+      }
+      
       setState(() {
         _promoCode = code;
-        _promoDiscount = _subtotal * 0.30;
+        _promoDiscount = discount;
         _promoApplied = true;
         _promoError = '';
       });
-    } else if (code == 'LIVRAISON') {
-      setState(() {
-        _promoCode = code;
-        _promoDiscount = _deliveryFee;
-        _promoApplied = true;
-        _promoError = '';
-      });
-    } else {
-      setState(() => _promoError = 'Code invalide');
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Code promo appliqué: -${discount.toStringAsFixed(0)} DA'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      setState(() => _promoError = 'Erreur: $e');
     }
   }
 
