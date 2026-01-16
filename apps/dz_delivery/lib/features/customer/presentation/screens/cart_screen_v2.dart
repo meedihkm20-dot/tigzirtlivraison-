@@ -1364,13 +1364,22 @@ class _CartScreenV2State extends ConsumerState<CartScreenV2> with TickerProvider
     setState(() => _promoError = '');
     
     try {
+      // Récupérer le restaurant actuel depuis le panier
+      final cartState = ref.read(cartProvider);
+      final restaurantId = cartState.currentRestaurantId;
+      
+      if (restaurantId == null) {
+        setState(() => _promoError = 'Erreur: restaurant non trouvé');
+        return;
+      }
+      
       // Vérifier le code promo via Supabase
       final promo = await SupabaseService.client
           .from('promotions')
           .select()
           .eq('code', code)
           .eq('is_active', true)
-          .eq('restaurant_id', _selectedRestaurant!['id'])
+          .eq('restaurant_id', restaurantId)
           .maybeSingle();
       
       if (promo == null) {
