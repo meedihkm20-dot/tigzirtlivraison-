@@ -134,7 +134,10 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
   List<Map<String, dynamic>> _getFilteredOrders(List<Map<String, dynamic>> orders) {
     switch (_filter) {
       case 'new':
-        return orders.where((o) => o['status'] == 'confirmed').toList();
+        // ✅ Nouvelles = pending OU confirmed (pas encore en préparation)
+        return orders.where((o) => 
+          o['status'] == 'pending' || o['status'] == 'confirmed'
+        ).toList();
       case 'preparing':
         return orders.where((o) => o['status'] == 'preparing').toList();
       default:
@@ -146,6 +149,20 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
     HapticFeedback.mediumImpact();
     try {
       final backendApi = BackendApiService(SupabaseService.client);
+      
+      // ✅ Récupérer le statut actuel de la commande
+      final orders = ref.read(pendingOrdersProvider);
+      final order = orders.firstWhere((o) => o['id'] == orderId);
+      final currentStatus = order['status'] as String;
+      
+      // ✅ Si pending → confirmer d'abord, puis préparer
+      if (currentStatus == 'pending') {
+        await backendApi.changeOrderStatus(orderId, 'confirmed');
+        // Petit délai pour que le backend traite
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+      
+      // ✅ Puis passer en préparation
       await backendApi.changeOrderStatus(orderId, 'preparing');
       _refreshOrders();
     } catch (e) {
@@ -185,7 +202,10 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
     // ✅ Utiliser le provider pour les commandes (synchronisé avec Dashboard)
     final orders = ref.watch(pendingOrdersProvider);
     final filteredOrders = _getFilteredOrders(orders);
-    final newCount = orders.where((o) => o['status'] == 'confirmed').length;
+    // ✅ Nouvelles = pending OU confirmed
+    final newCount = orders.where((o) => 
+      o['status'] == 'pending' || o['status'] == 'confirmed'
+    ).length;
     final preparingCount = orders.where((o) => o['status'] == 'preparing').length;
 
     return Scaffold(
