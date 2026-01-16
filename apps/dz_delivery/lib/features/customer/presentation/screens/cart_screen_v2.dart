@@ -72,35 +72,20 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final results = await Future.wait([
-        _safeCall(() => SupabaseService.getCartItems(), <Map<String, dynamic>>[]),
-        _safeCall(() => SupabaseService.getSavedAddresses(), <Map<String, dynamic>>[]),
-      ]);
-
-      final items = results[0] as List<Map<String, dynamic>>;
-      final addresses = results[1] as List<Map<String, dynamic>>;
-
-      // Load suggestions if we have items
-      List<Map<String, dynamic>> suggestions = [];
-      if (items.isNotEmpty) {
-        final restaurantId = items.first['restaurant_id'];
-        suggestions = await _safeCall(
-          () => SupabaseService.getMenuSuggestions(restaurantId, limit: 4),
-          <Map<String, dynamic>>[],
-        );
-      }
+      // Le panier est géré en state local - pas de table cart_items en base
+      // On charge seulement les adresses sauvegardées
+      final addresses = await _safeCall(() => SupabaseService.getSavedAddresses(), <Map<String, dynamic>>[]);
 
       if (mounted) {
         setState(() {
-          _cartItems = items;
+          // _cartItems est passé via arguments ou géré localement
           _addresses = addresses;
           _selectedAddress = addresses.isNotEmpty ? addresses.first : null;
-          _suggestions = suggestions;
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Erreur chargement panier: $e');
+      debugPrint('Erreur chargement données: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -1266,8 +1251,7 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
       }
     });
     
-    // Update in backend
-    await SupabaseService.updateCartItemQuantity(itemId, newQty);
+    // Panier géré en state local uniquement
   }
 
   void _removeItem(String itemId) async {
@@ -1275,7 +1259,7 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
     setState(() {
       _cartItems.removeWhere((i) => i['id'] == itemId);
     });
-    await SupabaseService.removeFromCart(itemId);
+    // Panier géré en state local uniquement
   }
 
   void _clearCart() async {
@@ -1297,14 +1281,29 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
     
     if (confirm == true) {
       setState(() => _cartItems.clear());
-      await SupabaseService.clearCart();
+      // Panier géré en state local uniquement
     }
   }
 
   void _addSuggestion(Map<String, dynamic> item) async {
     HapticFeedback.lightImpact();
-    await SupabaseService.addToCart(item['id'], 1);
-    _loadData();
+    // Ajouter directement au state local
+    setState(() {
+      final existingIndex = _cartItems.indexWhere((i) => i['menu_item_id'] == item['id']);
+      if (existingIndex != -1) {
+        _cartItems[existingIndex]['quantity'] = (_cartItems[existingIndex]['quantity'] ?? 1) + 1;
+      } else {
+        _cartItems.add({
+          'id': DateTime.now().millisecondsSinceEpoch.toString(),
+          'menu_item_id': item['id'],
+          'name': item['name'],
+          'price': item['price'],
+          'image_url': item['image_url'],
+          'restaurant_id': item['restaurant_id'],
+          'quantity': 1,
+        });
+      }
+    });
   }
 
   void _showAddressSelector() {
@@ -1440,8 +1439,8 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
       final order = orderResponse['order'];
 
       if (mounted) {
-        // Clear cart and navigate to tracking
-        await SupabaseService.clearCart();
+        // Clear cart (state local) and navigate to tracking
+        setState(() => _cartItems.clear());
         Navigator.pushReplacementNamed(
           context,
           AppRouter.orderTracking,

@@ -76,9 +76,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> with Si
     final itemId = item['id'] as String;
     
     try {
-      // Ajouter à Supabase
-      await SupabaseService.addToCart(itemId, 1);
-      
+      // Panier géré en state local uniquement
       setState(() {
         _cart[itemId] = (_cart[itemId] ?? 0) + 1;
       });

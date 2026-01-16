@@ -1405,66 +1405,8 @@ class SupabaseService {
   // ============================================
   // CLIENT V2 - MÉTHODES ADDITIONNELLES
   // ============================================
-
-  static Future<List<Map<String, dynamic>>> getCartItems() async {
-    if (currentUser == null) return [];
-    final response = await client.from('cart_items')
-        .select('*, menu_item:menu_items(*, restaurant:restaurants(name))')
-        .eq('customer_id', currentUser!.id);
-    return List<Map<String, dynamic>>.from(response).map((item) {
-      final menuItem = item['menu_item'] as Map<String, dynamic>?;
-      return {
-        'id': item['id'],
-        'menu_item_id': item['menu_item_id'],
-        'quantity': item['quantity'],
-        'name': menuItem?['name'],
-        'price': menuItem?['price'],
-        'image_url': menuItem?['image_url'],
-        'restaurant_id': menuItem?['restaurant_id'],
-        'restaurant_name': menuItem?['restaurant']?['name'],
-      };
-    }).toList();
-  }
-
-  static Future<void> addToCart(String menuItemId, int quantity) async {
-    if (currentUser == null) return;
-    final existing = await client.from('cart_items')
-        .select()
-        .eq('customer_id', currentUser!.id)
-        .eq('menu_item_id', menuItemId)
-        .maybeSingle();
-    
-    if (existing != null) {
-      await client.from('cart_items')
-          .update({'quantity': (existing['quantity'] as int) + quantity})
-          .eq('id', existing['id']);
-    } else {
-      await client.from('cart_items').insert({
-        'customer_id': currentUser!.id,
-        'menu_item_id': menuItemId,
-        'quantity': quantity,
-      });
-    }
-  }
-
-  static Future<void> updateCartItemQuantity(String cartItemId, int quantity) async {
-    await client.from('cart_items').update({'quantity': quantity}).eq('id', cartItemId);
-  }
-
-  static Future<void> removeFromCart(String cartItemId) async {
-    await client.from('cart_items').delete().eq('id', cartItemId);
-  }
-
-  static Future<void> clearCart() async {
-    if (currentUser == null) return;
-    await client.from('cart_items').delete().eq('customer_id', currentUser!.id);
-  }
-
-  static Future<List<Map<String, dynamic>>> getCartItems() async {
-    if (currentUser == null) return [];
-    final response = await client.rpc('get_cart_items', params: {'p_customer_id': currentUser!.id});
-    return List<Map<String, dynamic>>.from(response ?? []);
-  }
+  // NOTE: Les méthodes cart_items ont été supprimées car la table n'existe pas
+  // Le panier est géré en state Flutter (CartProvider/CartNotifier)
 
   static Future<List<Map<String, dynamic>>> getMenuSuggestions(String restaurantId, {int limit = 4}) async {
     final response = await client.from('menu_items')

@@ -5,6 +5,8 @@ import '../../../core/services/backend_api_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
 
+/// NOTE: Cette version est obsolète - utiliser CartScreenV2
+/// Le panier est géré en state local, pas en base de données
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
@@ -28,13 +30,8 @@ class _CartScreenState extends State<CartScreen> {
   Future<void> _loadCart() async {
     setState(() => _isLoading = true);
     try {
-      final cartItems = await SupabaseService.getCartItems();
+      // Panier géré en state local - pas de chargement depuis la base
       setState(() {
-        _items = cartItems;
-        if (_items.isNotEmpty) {
-          _restaurantId = _items.first['restaurant_id'];
-          _restaurantName = _items.first['restaurant_name'];
-        }
         _isLoading = false;
       });
     } catch (e) {
@@ -44,21 +41,17 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> _updateQuantity(int index, int delta) async {
-    final cartItemId = _items[index]['id'] as String;
     final newQuantity = (_items[index]['quantity'] as int) + delta;
     
     if (newQuantity <= 0) {
-      await SupabaseService.removeFromCart(cartItemId);
+      setState(() => _items.removeAt(index));
     } else {
-      await SupabaseService.updateCartItemQuantity(cartItemId, newQuantity);
+      setState(() => _items[index]['quantity'] = newQuantity);
     }
-    
-    await _loadCart();
   }
 
   Future<void> _clearCart() async {
-    await SupabaseService.clearCart();
-    await _loadCart();
+    setState(() => _items.clear());
   }
 
   double get _subtotal => _items.fold(0.0, (sum, item) => sum + ((item['item_price'] as num?)?.toDouble() ?? 0) * ((item['quantity'] as num?)?.toInt() ?? 1));
