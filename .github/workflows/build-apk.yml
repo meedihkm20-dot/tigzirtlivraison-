@@ -48,7 +48,8 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'master'
+          channel: 'stable'
+          flutter-version: '3.27.4'
       
       - name: Get dependencies
         working-directory: apps/dz_delivery
@@ -80,7 +81,8 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'master'
+          channel: 'stable'
+          flutter-version: '3.27.4'
       
       - name: Get dependencies
         working-directory: apps/admin_app
