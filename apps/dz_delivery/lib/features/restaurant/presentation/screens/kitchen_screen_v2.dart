@@ -150,21 +150,38 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
     try {
       final backendApi = BackendApiService(SupabaseService.client);
       
-      // ✅ Récupérer le statut actuel de la commande
+      // ✅ Vérifier le statut actuel
       final orders = ref.read(pendingOrdersProvider);
       final order = orders.firstWhere((o) => o['id'] == orderId);
       final currentStatus = order['status'] as String;
       
-      // ✅ Si pending → confirmer d'abord, puis préparer
+      // ⚠️ RÈGLE MÉTIER: Seul le livreur peut confirmer (pending → confirmed)
+      // Le restaurant ne peut préparer QUE si déjà confirmé
       if (currentStatus == 'pending') {
-        await backendApi.changeOrderStatus(orderId, 'confirmed');
-        // Petit délai pour que le backend traite
-        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⏳ En attente qu\'un livreur accepte la commande'),
+              backgroundColor: AppColors.warning,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
       }
       
-      // ✅ Puis passer en préparation
+      // ✅ Passer en préparation (seulement si confirmed)
       await backendApi.changeOrderStatus(orderId, 'preparing');
       _refreshOrders();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('👨‍🍳 Préparation démarrée!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -432,6 +449,8 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
     final createdAt = DateTime.tryParse(order['created_at'] ?? '') ?? DateTime.now();
     final elapsedMinutes = DateTime.now().difference(createdAt).inMinutes;
     final priorityColor = AppColors.getPriorityColor(elapsedMinutes);
+    final isPending = status == 'pending';
+    final isConfirmed = status == 'confirmed';
     final isPreparing = status == 'preparing';
     final isUrgent = elapsedMinutes > 20;
     final livreur = order['livreur'];
@@ -457,7 +476,7 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              _buildCardHeader(order, elapsedMinutes, priorityColor, isPreparing),
+              _buildCardHeader(order, elapsedMinutes, priorityColor, status),
               
               // Items
               Expanded(
@@ -468,7 +487,7 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
               if (livreur != null) _buildLivreurInfo(livreur),
               
               // Action button
-              _buildActionButton(order['id'], isPreparing),
+              _buildActionButton(order['id'], status),
             ],
           ),
         );
@@ -480,8 +499,30 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
     Map<String, dynamic> order,
     int elapsedMinutes,
     Color priorityColor,
-    bool isPreparing,
+    String status,
   ) {
+    // Déterminer le label et la couleur selon le statut
+    String statusLabel;
+    Color statusColor;
+    
+    switch (status) {
+      case 'pending':
+        statusLabel = 'En attente livreur';
+        statusColor = AppColors.warning;
+        break;
+      case 'confirmed':
+        statusLabel = 'Livreur accepté';
+        statusColor = AppColors.info;
+        break;
+      case 'preparing':
+        statusLabel = 'En préparation';
+        statusColor = AppColors.primary;
+        break;
+      default:
+        statusLabel = 'Nouvelle';
+        statusColor = AppColors.warning;
+    }
+    
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -509,15 +550,15 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: isPreparing ? AppColors.info : AppColors.warning,
+                        color: statusColor,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      isPreparing ? 'En préparation' : 'Nouvelle',
+                      statusLabel,
                       style: AppTypography.labelSmall.copyWith(
-                        color: isPreparing ? AppColors.info : AppColors.warning,
+                        color: statusColor,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -669,39 +710,128 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
     );
   }
 
-  Widget _buildActionButton(String orderId, bool isPreparing) {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: () => isPreparing ? _markAsReady(orderId) : _startPreparing(orderId),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: isPreparing ? AppColors.success : AppColors.primary,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: AppSpacing.borderRadiusMd,
+  Widget _buildActionButton(String orderId, String status) {
+    // Déterminer l'action selon le statut
+    bool isPending = status == 'pending';
+    bool isConfirmed = status == 'confirmed';
+    bool isPreparing = status == 'preparing';
+    
+    // Si pending, afficher un message d'attente
+    if (isPending) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.warningSurface,
+          borderRadius: AppSpacing.borderRadiusMd,
+          border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.warning),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'En attente d\'un livreur',
+                    style: AppTypography.labelMedium.copyWith(
+                      color: AppColors.warning,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Vous pourrez préparer dès qu\'un livreur accepte',
+                    style: AppTypography.labelSmall.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Si confirmed, bouton pour démarrer la préparation
+    if (isConfirmed) {
+      return Padding(
+        padding: const EdgeInsets.all(12),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => _startPreparing(orderId),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppSpacing.borderRadiusMd,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.restaurant, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'DÉMARRER PRÉPARATION',
+                  style: AppTypography.labelLarge.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                isPreparing ? Icons.check_circle : Icons.restaurant,
-                size: 18,
+        ),
+      );
+    }
+    
+    // Si preparing, bouton pour marquer prêt
+    if (isPreparing) {
+      return Padding(
+        padding: const EdgeInsets.all(12),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => _markAsReady(orderId),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppSpacing.borderRadiusMd,
               ),
-              const SizedBox(width: 8),
-              Text(
-                isPreparing ? 'PRÊT' : 'PRÉPARER',
-                style: AppTypography.labelLarge.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.check_circle, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'MARQUER PRÊT',
+                  style: AppTypography.labelLarge.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
+    }
+    
+    // Fallback (ne devrait pas arriver)
+    return const SizedBox.shrink();
   }
 }
