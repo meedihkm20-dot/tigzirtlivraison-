@@ -159,7 +159,8 @@ export class OrdersService {
   }
 
   /**
-   * Restaurant accepte la commande
+   * Restaurant confirme la commande
+   * ⚠️ SQL: status 'confirmed' (pas 'accepted')
    */
   async acceptOrder(orderId: string, restaurantOwnerId: string) {
     const order = await this.supabaseService.getOrderById(orderId);
@@ -171,10 +172,11 @@ export class OrdersService {
       throw new BadRequestException('Non autorisé');
     }
 
-    await this.supabaseService.updateOrderStatus(orderId, 'accepted');
-    await this.notificationsService.notifyOrderAccepted(orderId);
+    // ⚠️ SQL: 'confirmed' (pas 'accepted')
+    await this.supabaseService.updateOrderStatus(orderId, 'confirmed');
+    await this.notificationsService.notifyOrderConfirmed(orderId);
 
-    this.logger.log(`Order accepted: ${orderId}`);
+    this.logger.log(`Order confirmed: ${orderId}`);
     return { success: true };
   }
 
@@ -479,7 +481,8 @@ export class OrdersService {
     try {
       switch (status) {
         case 'confirmed':
-          await this.notificationsService.notifyOrderAccepted(orderId);
+          // ⚠️ SQL: 'confirmed' (pas 'accepted')
+          await this.notificationsService.notifyOrderConfirmed(orderId);
           break;
         case 'preparing':
           // Notification optionnelle

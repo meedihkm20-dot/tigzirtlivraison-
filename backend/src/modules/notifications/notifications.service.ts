@@ -81,10 +81,11 @@ export class NotificationsService {
       const order = await this.supabaseService.getOrderById(orderId);
       const restaurant = await this.supabaseService.getRestaurantById(order.restaurant_id);
 
+      // ⚠️ SQL: "total" (pas "total_amount")
       return this.sendPushToUser(
         restaurant.owner_id,
         '🔔 Nouvelle commande !',
-        `Commande #${order.order_number} - ${order.total_amount} DA`,
+        `Commande #${order.order_number} - ${order.total} DA`,
         {
           type: 'new_order',
           order_id: orderId,
@@ -98,22 +99,28 @@ export class NotificationsService {
   }
 
   /**
-   * Commande acceptée → Notifier le client
+   * Commande confirmée → Notifier le client
+   * ⚠️ SQL: status 'confirmed' (pas 'accepted')
    */
-  async notifyOrderAccepted(orderId: string): Promise<OneSignalResponse | null> {
+  async notifyOrderConfirmed(orderId: string): Promise<OneSignalResponse | null> {
     try {
       const order = await this.supabaseService.getOrderById(orderId);
 
       return this.sendPushToUser(
         order.user_id,
-        '✅ Commande acceptée !',
+        '✅ Commande confirmée !',
         `Votre commande #${order.order_number} est en préparation`,
-        { type: 'order_accepted', order_id: orderId },
+        { type: 'order_confirmed', order_id: orderId },
       );
     } catch (error) {
-      this.logger.error(`notifyOrderAccepted error: ${(error as Error).message}`);
+      this.logger.error(`notifyOrderConfirmed error: ${(error as Error).message}`);
       return null;
     }
+  }
+
+  // Alias pour compatibilité (deprecated - utiliser notifyOrderConfirmed)
+  async notifyOrderAccepted(orderId: string): Promise<OneSignalResponse | null> {
+    return this.notifyOrderConfirmed(orderId);
   }
 
   /**
@@ -138,19 +145,19 @@ export class NotificationsService {
   /**
    * Livreur assigné → Notifier le client
    */
-  async notifyDriverAssigned(orderId: string, driverId: string): Promise<OneSignalResponse | null> {
+  async notifyDriverAssigned(orderId: string, livreurId: string): Promise<OneSignalResponse | null> {
     try {
       const order = await this.supabaseService.getOrderById(orderId);
-      const driver = await this.supabaseService.getUserById(driverId);
+      const livreur = await this.supabaseService.getUserById(livreurId);
 
       return this.sendPushToUser(
         order.user_id,
         '🚚 Livreur en route !',
-        `${driver.full_name || 'Un livreur'} arrive avec votre commande`,
+        `${livreur.full_name || 'Un livreur'} arrive avec votre commande`,
         {
           type: 'driver_assigned',
           order_id: orderId,
-          driver_id: driverId,
+          livreur_id: livreurId, // ⚠️ SQL: "livreur_id"
         },
       );
     } catch (error) {
@@ -162,12 +169,12 @@ export class NotificationsService {
   /**
    * Nouvelle livraison → Notifier le livreur
    */
-  async notifyDriverNewDelivery(driverId: string, orderId: string): Promise<OneSignalResponse | null> {
+  async notifyDriverNewDelivery(livreurId: string, orderId: string): Promise<OneSignalResponse | null> {
     try {
       const order = await this.supabaseService.getOrderById(orderId);
 
       return this.sendPushToUser(
-        driverId,
+        livreurId,
         '📦 Nouvelle livraison !',
         `Commande #${order.order_number} à récupérer`,
         { type: 'new_delivery', order_id: orderId },

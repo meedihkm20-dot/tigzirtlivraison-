@@ -9,11 +9,11 @@ export class NotifyOrderDto {
 
 export class NotifyDriverAssignedDto {
   order_id: string;
-  driver_id: string;
+  livreur_id: string; // ⚠️ SQL: "livreur_id" (pas "driver_id")
 }
 
 export class NotifyNewDeliveryDto {
-  driver_id: string;
+  livreur_id: string; // ⚠️ SQL: "livreur_id" (pas "driver_id")
   order_id: string;
 }
 

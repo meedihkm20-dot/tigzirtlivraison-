@@ -31,8 +31,9 @@ export class WebhooksController {
 
       if (newStatus !== oldStatus && orderId) {
         switch (newStatus) {
-          case 'accepted':
-            await this.notificationsService.notifyOrderAccepted(orderId);
+          // ⚠️ SQL: 'confirmed' (pas 'accepted')
+          case 'confirmed':
+            await this.notificationsService.notifyOrderConfirmed(orderId);
             break;
           case 'ready':
             await this.notificationsService.notifyOrderReady(orderId);

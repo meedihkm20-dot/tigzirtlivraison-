@@ -21,10 +21,17 @@ export class NotificationsController {
     return this.notificationsService.notifyNewOrder(body.order_id);
   }
 
+  @Post('order-confirmed')
+  @ApiOperation({ summary: 'Notifier client - commande confirmée' })
+  async orderConfirmed(@Body() body: NotifyOrderDto): Promise<OneSignalResponse | null> {
+    return this.notificationsService.notifyOrderConfirmed(body.order_id);
+  }
+
+  // Alias pour compatibilité (deprecated)
   @Post('order-accepted')
-  @ApiOperation({ summary: 'Notifier client - commande acceptée' })
+  @ApiOperation({ summary: 'Notifier client - commande confirmée (alias deprecated)' })
   async orderAccepted(@Body() body: NotifyOrderDto): Promise<OneSignalResponse | null> {
-    return this.notificationsService.notifyOrderAccepted(body.order_id);
+    return this.notificationsService.notifyOrderConfirmed(body.order_id);
   }
 
   @Post('order-ready')
@@ -38,7 +45,7 @@ export class NotificationsController {
   async driverAssigned(@Body() body: NotifyDriverAssignedDto): Promise<OneSignalResponse | null> {
     return this.notificationsService.notifyDriverAssigned(
       body.order_id,
-      body.driver_id,
+      body.livreur_id, // ⚠️ SQL: "livreur_id"
     );
   }
 
@@ -46,7 +53,7 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Notifier livreur - nouvelle livraison' })
   async newDelivery(@Body() body: NotifyNewDeliveryDto): Promise<OneSignalResponse | null> {
     return this.notificationsService.notifyDriverNewDelivery(
-      body.driver_id,
+      body.livreur_id, // ⚠️ SQL: "livreur_id"
       body.order_id,
     );
   }
