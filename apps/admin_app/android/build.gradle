@@ -11,6 +11,21 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+    
+    // Force Java 17 for all subprojects to avoid obsolete source/target warnings
+    afterEvaluate {
+        if (project.hasProperty('android')) {
+            android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+            }
+        }
+        tasks.withType(JavaCompile).configureEach {
+            options.compilerArgs << '-Xlint:-options'
+        }
+    }
 }
 
 tasks.register("clean", Delete) {
