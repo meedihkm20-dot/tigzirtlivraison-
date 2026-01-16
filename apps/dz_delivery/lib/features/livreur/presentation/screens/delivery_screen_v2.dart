@@ -621,7 +621,7 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
   Widget _buildOrderInfo() {
     final items = _order?['items'] as List<dynamic>? ?? [];
     final total = (_order?['total'] as num?)?.toDouble() ?? 0;
-    final note = _order?['note'];
+    final note = _order?['delivery_instructions'];
 
     return Container(
       margin: AppSpacing.screen,
@@ -664,18 +664,38 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
             ),
           if (note != null && note.isNotEmpty) ...[
             const Divider(height: 16),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.note, size: 16, color: AppColors.warning),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    note,
-                    style: AppTypography.bodySmall.copyWith(color: AppColors.warning),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warningSurface,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.note_alt, size: 20, color: AppColors.warning),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Note du client',
+                          style: AppTypography.labelMedium.copyWith(
+                            color: AppColors.warning,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          note,
+                          style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ],
