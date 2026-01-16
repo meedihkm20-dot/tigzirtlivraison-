@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
@@ -10,23 +11,20 @@ import '../../../../core/design_system/components/cards/order_card.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/backend_api_service.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../providers/providers.dart';
 
-class RestaurantDashboardScreen extends StatefulWidget {
+class RestaurantDashboardScreen extends ConsumerStatefulWidget {
   const RestaurantDashboardScreen({super.key});
 
   @override
-  State<RestaurantDashboardScreen> createState() => _RestaurantDashboardScreenState();
+  ConsumerState<RestaurantDashboardScreen> createState() => _RestaurantDashboardScreenState();
 }
 
-class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
+class _RestaurantDashboardScreenState extends ConsumerState<RestaurantDashboardScreen>
     with TickerProviderStateMixin {
-  bool _isOpen = true;
   bool _isLoading = true;
   int _currentIndex = 0;
   
-  Map<String, dynamic>? _restaurant;
-  Map<String, dynamic> _stats = {};
-  List<Map<String, dynamic>> _pendingOrders = [];
   List<double> _weeklyRevenue = [];
   
   RealtimeChannel? _ordersChannel;
@@ -52,8 +50,12 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final restaurant = await SupabaseService.getMyRestaurant();
-      if (restaurant == null) {
+      // ✅ Utiliser le provider pour charger les données
+      await ref.read(restaurantProvider.notifier).loadAll();
+      
+      final restaurantState = ref.read(restaurantProvider);
+      
+      if (restaurantState.restaurant == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -64,24 +66,17 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
         }
         return;
       }
-
-      final pendingOrders = await SupabaseService.getRestaurantPendingOrders();
-      final stats = await SupabaseService.getRestaurantStats();
       
       // Simuler les données hebdomadaires (à remplacer par vraies données)
       final weeklyData = [2500.0, 3200.0, 2800.0, 4100.0, 3800.0, 5200.0, 6350.0];
 
       if (mounted) {
         setState(() {
-          _restaurant = restaurant;
-          _isOpen = restaurant['is_open'] ?? true;
-          _pendingOrders = pendingOrders;
-          _stats = stats;
           _weeklyRevenue = weeklyData;
         });
 
         // Subscribe to realtime orders
-        _subscribeToOrders(restaurant['id']);
+        _subscribeToOrders(restaurantState.restaurantId!);
       }
     } catch (e) {
       debugPrint('Erreur chargement: $e');
@@ -104,7 +99,9 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
       restaurantId,
       (order) {
         HapticFeedback.heavyImpact();
-        _loadData();
+        // ✅ Ajouter la commande via le provider
+        ref.read(restaurantProvider.notifier).addPendingOrder(order);
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -126,12 +123,11 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
 
   Future<void> _toggleOpen(bool value) async {
     HapticFeedback.mediumImpact();
-    setState(() => _isOpen = value);
     try {
-      await SupabaseService.setRestaurantOpen(value);
+      // ✅ Utiliser le provider pour toggle open
+      await ref.read(restaurantProvider.notifier).toggleOpen(value);
     } catch (e) {
       if (mounted) {
-        setState(() => _isOpen = !value);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erreur: $e'), backgroundColor: AppColors.error),
         );
@@ -156,6 +152,13 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Utiliser le provider pour les données
+    final restaurantState = ref.watch(restaurantProvider);
+    final restaurant = restaurantState.restaurant;
+    final isOpen = restaurantState.isOpen;
+    final pendingOrders = restaurantState.pendingOrders;
+    final stats = restaurantState.stats;
+    
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -168,7 +171,7 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                   physics: const AlwaysScrollableScrollPhysics(),
                   slivers: [
                     // App Bar
-                    _buildAppBar(),
+                    _buildAppBar(restaurant, isOpen),
                     
                     // Content
                     SliverPadding(
@@ -176,7 +179,7 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                       sliver: SliverList(
                         delegate: SliverChildListDelegate([
                           // Stats Grid
-                          _buildStatsGrid(),
+                          _buildStatsGrid(stats, pendingOrders.length),
                           AppSpacing.vLg,
                           
                           // Weekly Chart
@@ -184,15 +187,15 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                           AppSpacing.vLg,
                           
                           // Quick Actions
-                          _buildQuickActions(),
+                          _buildQuickActions(pendingOrders.length),
                           AppSpacing.vLg,
                           
                           // Live Activity
-                          _buildLiveActivity(),
+                          _buildLiveActivity(pendingOrders),
                           AppSpacing.vLg,
                           
                           // Pending Orders
-                          _buildPendingOrders(),
+                          _buildPendingOrders(pendingOrders),
                           AppSpacing.vXxl,
                         ]),
                       ),
@@ -205,7 +208,7 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
     );
   }
 
-  Widget _buildAppBar() {
+  Widget _buildAppBar(RestaurantModel? restaurant, bool isOpen) {
     return SliverAppBar(
       floating: true,
       backgroundColor: AppColors.surface,
@@ -219,14 +222,14 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
             decoration: BoxDecoration(
               color: AppColors.primarySurface,
               borderRadius: AppSpacing.borderRadiusMd,
-              image: _restaurant?['logo_url'] != null
+              image: restaurant?.logoUrl != null
                   ? DecorationImage(
-                      image: NetworkImage(_restaurant!['logo_url']),
+                      image: NetworkImage(restaurant!.logoUrl!),
                       fit: BoxFit.cover,
                     )
                   : null,
             ),
-            child: _restaurant?['logo_url'] == null
+            child: restaurant?.logoUrl == null
                 ? const Icon(Icons.restaurant, color: AppColors.primary, size: 20)
                 : null,
           ),
@@ -236,7 +239,7 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _restaurant?['name'] ?? 'Mon Restaurant',
+                  restaurant?.name ?? 'Mon Restaurant',
                   style: AppTypography.titleMedium,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -250,14 +253,14 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${(_restaurant?['rating'] ?? 0).toStringAsFixed(1)}',
+                      '${(restaurant?.rating ?? 0).toStringAsFixed(1)}',
                       style: AppTypography.bodySmall.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '(${_restaurant?['total_reviews'] ?? 0} avis)',
+                      '(${restaurant?.totalReviews ?? 0} avis)',
                       style: AppTypography.bodySmall.copyWith(
                         color: AppColors.textTertiary,
                       ),
@@ -271,23 +274,23 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
       ),
       actions: [
         // Open/Close toggle
-        _buildOpenToggle(),
+        _buildOpenToggle(isOpen),
         const SizedBox(width: 8),
       ],
     );
   }
 
-  Widget _buildOpenToggle() {
+  Widget _buildOpenToggle(bool isOpen) {
     return GestureDetector(
-      onTap: () => _toggleOpen(!_isOpen),
+      onTap: () => _toggleOpen(!isOpen),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: _isOpen ? AppColors.successSurface : AppColors.errorSurface,
+          color: isOpen ? AppColors.successSurface : AppColors.errorSurface,
           borderRadius: AppSpacing.borderRadiusRound,
           border: Border.all(
-            color: _isOpen ? AppColors.success : AppColors.error,
+            color: isOpen ? AppColors.success : AppColors.error,
             width: 1.5,
           ),
         ),
@@ -299,15 +302,15 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
               width: 8,
               height: 8,
               decoration: BoxDecoration(
-                color: _isOpen ? AppColors.success : AppColors.error,
+                color: isOpen ? AppColors.success : AppColors.error,
                 shape: BoxShape.circle,
               ),
             ),
             const SizedBox(width: 6),
             Text(
-              _isOpen ? 'Ouvert' : 'Fermé',
+              isOpen ? 'Ouvert' : 'Fermé',
               style: AppTypography.labelSmall.copyWith(
-                color: _isOpen ? AppColors.success : AppColors.error,
+                color: isOpen ? AppColors.success : AppColors.error,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -317,11 +320,10 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
     );
   }
 
-  Widget _buildStatsGrid() {
-    final ordersToday = _stats['orders_today'] ?? 0;
-    final revenueToday = (_stats['revenue_today'] ?? 0).toDouble();
-    final pendingCount = _stats['pending_orders'] ?? 0;
-    final totalOrders = _stats['total_orders'] ?? 0;
+  Widget _buildStatsGrid(Map<String, dynamic> stats, int pendingCount) {
+    final ordersToday = stats['orders_today'] ?? 0;
+    final revenueToday = (stats['revenue_today'] ?? 0).toDouble();
+    final totalOrders = stats['total_orders'] ?? 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,7 +485,7 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(int pendingCount) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -499,7 +501,7 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
                 icon: Icons.restaurant_menu,
                 label: 'Cuisine',
                 color: AppColors.warning,
-                badge: _pendingOrders.length,
+                badge: pendingCount,
                 onTap: () => Navigator.pushNamed(context, AppRouter.kitchen),
               ),
             ),
@@ -642,8 +644,8 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
     );
   }
 
-  Widget _buildLiveActivity() {
-    if (_pendingOrders.isEmpty) return const SizedBox.shrink();
+  Widget _buildLiveActivity(List<Map<String, dynamic>> pendingOrders) {
+    if (pendingOrders.isEmpty) return const SizedBox.shrink();
 
     return Container(
       padding: AppSpacing.card,
@@ -690,7 +692,7 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
               ),
               const Spacer(),
               Text(
-                '${_pendingOrders.length} commande${_pendingOrders.length > 1 ? 's' : ''} en cours',
+                '${pendingOrders.length} commande${pendingOrders.length > 1 ? 's' : ''} en cours',
                 style: AppTypography.bodySmall.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -698,7 +700,7 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
             ],
           ),
           AppSpacing.vMd,
-          ..._pendingOrders.take(3).map((order) {
+          ...pendingOrders.take(3).map((order) {
             final status = order['status'] as String? ?? '';
             final statusInfo = _getStatusInfo(status);
             return Padding(
@@ -744,7 +746,7 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
     );
   }
 
-  Widget _buildPendingOrders() {
+  Widget _buildPendingOrders(List<Map<String, dynamic>> pendingOrders) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -755,7 +757,7 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
               '📋 Commandes en cours',
               style: AppTypography.titleMedium,
             ),
-            if (_pendingOrders.isNotEmpty)
+            if (pendingOrders.isNotEmpty)
               TextButton(
                 onPressed: () => Navigator.pushNamed(context, AppRouter.kitchen),
                 child: const Text('Voir tout'),
@@ -763,10 +765,10 @@ class _RestaurantDashboardScreenState extends State<RestaurantDashboardScreen>
           ],
         ),
         AppSpacing.vMd,
-        if (_pendingOrders.isEmpty)
+        if (pendingOrders.isEmpty)
           _buildEmptyState()
         else
-          ..._pendingOrders.map((order) => _buildOrderCard(order)),
+          ...pendingOrders.map((order) => _buildOrderCard(order)),
       ],
     );
   }

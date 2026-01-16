@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
@@ -8,19 +9,20 @@ import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/design_system/components/badges/status_badge.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../providers/providers.dart';
 
 /// Écran détail restaurant premium V2
 /// Design attractif et séduisant pour le client
-class RestaurantDetailScreenV2 extends StatefulWidget {
+class RestaurantDetailScreenV2 extends ConsumerStatefulWidget {
   final String restaurantId;
 
   const RestaurantDetailScreenV2({super.key, required this.restaurantId});
 
   @override
-  State<RestaurantDetailScreenV2> createState() => _RestaurantDetailScreenV2State();
+  ConsumerState<RestaurantDetailScreenV2> createState() => _RestaurantDetailScreenV2State();
 }
 
-class _RestaurantDetailScreenV2State extends State<RestaurantDetailScreenV2>
+class _RestaurantDetailScreenV2State extends ConsumerState<RestaurantDetailScreenV2>
     with SingleTickerProviderStateMixin {
   Map<String, dynamic>? _restaurant;
   List<Map<String, dynamic>> _menuItems = [];
@@ -64,12 +66,16 @@ class _RestaurantDetailScreenV2State extends State<RestaurantDetailScreenV2>
       final categories = await SupabaseService.getRestaurantCategories(widget.restaurantId);
       final reviews = await SupabaseService.getRestaurantReviews(widget.restaurantId);
       
+      // Charger l'état favori depuis le provider
+      final isFav = ref.read(favoritesProvider).isRestaurantFavorite(widget.restaurantId);
+      
       if (mounted) {
         setState(() {
           _restaurant = restaurant;
           _menuItems = menuItems;
           _categories = categories;
           _reviews = reviews;
+          _isFavorite = isFav;
           _isLoading = false;
         });
       }
@@ -82,7 +88,8 @@ class _RestaurantDetailScreenV2State extends State<RestaurantDetailScreenV2>
   Future<void> _toggleFavorite() async {
     HapticFeedback.lightImpact();
     setState(() => _isFavorite = !_isFavorite);
-    // TODO: Sauvegarder en base
+    // Utiliser le provider pour toggle le favori
+    await ref.read(favoritesProvider.notifier).toggleRestaurantFavorite(widget.restaurantId);
   }
 
   @override
@@ -701,10 +708,20 @@ class _RestaurantDetailScreenV2State extends State<RestaurantDetailScreenV2>
 
   void _addToCart(Map<String, dynamic> item) {
     HapticFeedback.mediumImpact();
-    // TODO: Ajouter au panier
+    
+    // Utiliser le cartProvider pour ajouter au panier
+    ref.read(cartProvider.notifier).addFromMenuItem(
+      item,
+      widget.restaurantId,
+      _restaurant?['name'] ?? 'Restaurant',
+    );
+    
+    // Afficher le nombre d'articles dans le panier
+    final cartCount = ref.read(cartItemCountProvider);
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${item['name']} ajouté au panier'),
+        content: Text('${item['name']} ajouté au panier ($cartCount)'),
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
         action: SnackBarAction(
@@ -1008,6 +1025,9 @@ class _RestaurantDetailScreenV2State extends State<RestaurantDetailScreenV2>
   }
 
   Widget _buildBottomBar() {
+    final cartCount = ref.watch(cartItemCountProvider);
+    final cartSubtotal = ref.watch(cartSubtotalProvider);
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1017,12 +1037,20 @@ class _RestaurantDetailScreenV2State extends State<RestaurantDetailScreenV2>
       child: SafeArea(
         child: Row(
           children: [
-            // Panier
+            // Panier avec compteur
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: () => Navigator.pushNamed(context, AppRouter.cart),
-                icon: const Icon(Icons.shopping_cart),
-                label: const Text('Voir le panier'),
+                icon: Badge(
+                  isLabelVisible: cartCount > 0,
+                  label: Text('$cartCount'),
+                  child: const Icon(Icons.shopping_cart),
+                ),
+                label: Text(
+                  cartCount > 0 
+                    ? 'Panier (${cartSubtotal.toStringAsFixed(0)} DA)'
+                    : 'Voir le panier',
+                ),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),

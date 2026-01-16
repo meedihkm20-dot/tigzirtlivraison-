@@ -1,46 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../../core/services/supabase_service.dart';
+import '../../../../providers/favorites_provider.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
 
-class FavoritesScreen extends StatefulWidget {
+class FavoritesScreen extends ConsumerStatefulWidget {
   const FavoritesScreen({super.key});
 
   @override
-  State<FavoritesScreen> createState() => _FavoritesScreenState();
+  ConsumerState<FavoritesScreen> createState() => _FavoritesScreenState();
 }
 
-class _FavoritesScreenState extends State<FavoritesScreen> {
-  List<Map<String, dynamic>> _favorites = [];
-  bool _isLoading = true;
-
+class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   @override
   void initState() {
     super.initState();
-    _loadFavorites();
-  }
-
-  Future<void> _loadFavorites() async {
-    setState(() => _isLoading = true);
-    try {
-      final favorites = await SupabaseService.getFavoriteRestaurants();
-      if (mounted) {
-        setState(() {
-          _favorites = favorites;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Erreur chargement favoris: $e');
-      if (mounted) setState(() => _isLoading = false);
-    }
+    // Charger les favoris au démarrage
+    Future.microtask(() {
+      ref.read(favoritesProvider.notifier).loadFavorites();
+    });
   }
 
   Future<void> _removeFavorite(String restaurantId) async {
     try {
-      await SupabaseService.toggleFavoriteRestaurant(restaurantId);
-      _loadFavorites();
+      await ref.read(favoritesProvider.notifier).toggleRestaurantFavorite(restaurantId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Retiré des favoris'), duration: Duration(seconds: 1)),
@@ -57,13 +41,17 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final favoritesState = ref.watch(favoritesProvider);
+    final favorites = favoritesState.favoriteRestaurants;
+    final isLoading = favoritesState.isLoading;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mes Favoris ❤️'),
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _favorites.isEmpty
+          : favorites.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -81,17 +69,17 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   ),
                 )
               : RefreshIndicator(
-                  onRefresh: _loadFavorites,
+                  onRefresh: () => ref.read(favoritesProvider.notifier).refresh(),
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: _favorites.length,
+                    itemCount: favorites.length,
                     itemBuilder: (context, index) {
-                      final fav = _favorites[index];
+                      final fav = favorites[index];
                       final restaurant = fav['restaurant'] as Map<String, dynamic>?;
                       if (restaurant == null) return const SizedBox();
                       
                       return Dismissible(
-                        key: Key(fav['id']),
+                        key: Key(fav['id']?.toString() ?? index.toString()),
                         direction: DismissDirection.endToStart,
                         background: Container(
                           alignment: Alignment.centerRight,

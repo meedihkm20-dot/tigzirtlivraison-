@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
@@ -8,19 +9,19 @@ import '../../../../core/design_system/theme/app_spacing.dart';
 import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/backend_api_service.dart';
+import '../../../../providers/providers.dart';
 
 /// Écran Cuisine Premium V2
 /// Vue en grille avec priorités visuelles, sons et animations
-class KitchenScreenV2 extends StatefulWidget {
+class KitchenScreenV2 extends ConsumerStatefulWidget {
   const KitchenScreenV2({super.key});
 
   @override
-  State<KitchenScreenV2> createState() => _KitchenScreenV2State();
+  ConsumerState<KitchenScreenV2> createState() => _KitchenScreenV2State();
 }
 
-class _KitchenScreenV2State extends State<KitchenScreenV2>
+class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
     with TickerProviderStateMixin {
-  List<Map<String, dynamic>> _orders = [];
   bool _isLoading = true;
   Timer? _refreshTimer;
   int _previousOrderCount = 0;
@@ -49,7 +50,7 @@ class _KitchenScreenV2State extends State<KitchenScreenV2>
     _loadOrders();
     _refreshTimer = Timer.periodic(
       const Duration(seconds: 5),
-      (_) => _loadOrders(),
+      (_) => _refreshOrders(),
     );
   }
 
@@ -63,6 +64,21 @@ class _KitchenScreenV2State extends State<KitchenScreenV2>
   }
 
   Future<void> _loadOrders() async {
+    setState(() => _isLoading = true);
+    try {
+      // ✅ Utiliser le provider pour charger les commandes
+      await ref.read(restaurantProvider.notifier).refreshPendingOrders();
+      
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      debugPrint('Erreur chargement cuisine: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _refreshOrders() async {
     try {
       final orders = await SupabaseService.getKitchenOrders();
       
@@ -72,15 +88,10 @@ class _KitchenScreenV2State extends State<KitchenScreenV2>
       }
       _previousOrderCount = orders.length;
       
-      if (mounted) {
-        setState(() {
-          _orders = orders;
-          _isLoading = false;
-        });
-      }
+      // ✅ Mettre à jour via le provider
+      ref.read(restaurantProvider.notifier).setPendingOrders(orders);
     } catch (e) {
-      debugPrint('Erreur chargement cuisine: $e');
-      if (mounted) setState(() => _isLoading = false);
+      debugPrint('Erreur refresh cuisine: $e');
     }
   }
 
@@ -120,14 +131,14 @@ class _KitchenScreenV2State extends State<KitchenScreenV2>
     }
   }
 
-  List<Map<String, dynamic>> get _filteredOrders {
+  List<Map<String, dynamic>> _getFilteredOrders(List<Map<String, dynamic>> orders) {
     switch (_filter) {
       case 'new':
-        return _orders.where((o) => o['status'] == 'confirmed').toList();
+        return orders.where((o) => o['status'] == 'confirmed').toList();
       case 'preparing':
-        return _orders.where((o) => o['status'] == 'preparing').toList();
+        return orders.where((o) => o['status'] == 'preparing').toList();
       default:
-        return _orders;
+        return orders;
     }
   }
 
@@ -136,7 +147,7 @@ class _KitchenScreenV2State extends State<KitchenScreenV2>
     try {
       final backendApi = BackendApiService(SupabaseService.client);
       await backendApi.changeOrderStatus(orderId, 'preparing');
-      _loadOrders();
+      _refreshOrders();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -159,7 +170,7 @@ class _KitchenScreenV2State extends State<KitchenScreenV2>
           ),
         );
       }
-      _loadOrders();
+      _refreshOrders();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -171,15 +182,18 @@ class _KitchenScreenV2State extends State<KitchenScreenV2>
 
   @override
   Widget build(BuildContext context) {
-    final newCount = _orders.where((o) => o['status'] == 'confirmed').length;
-    final preparingCount = _orders.where((o) => o['status'] == 'preparing').length;
+    // ✅ Utiliser le provider pour les commandes (synchronisé avec Dashboard)
+    final orders = ref.watch(pendingOrdersProvider);
+    final filteredOrders = _getFilteredOrders(orders);
+    final newCount = orders.where((o) => o['status'] == 'confirmed').length;
+    final preparingCount = orders.where((o) => o['status'] == 'preparing').length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: _buildAppBar(newCount, preparingCount),
+      appBar: _buildAppBar(orders.length, newCount, preparingCount),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _filteredOrders.isEmpty
+          : filteredOrders.isEmpty
               ? _buildEmptyState()
               : RefreshIndicator(
                   onRefresh: _loadOrders,
@@ -198,8 +212,8 @@ class _KitchenScreenV2State extends State<KitchenScreenV2>
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
                           ),
-                          itemCount: _filteredOrders.length,
-                          itemBuilder: (context, index) => _buildOrderCard(_filteredOrders[index]),
+                          itemCount: filteredOrders.length,
+                          itemBuilder: (context, index) => _buildOrderCard(filteredOrders[index]),
                         ),
                       ),
                     ],
@@ -208,7 +222,7 @@ class _KitchenScreenV2State extends State<KitchenScreenV2>
     );
   }
 
-  PreferredSizeWidget _buildAppBar(int newCount, int preparingCount) {
+  PreferredSizeWidget _buildAppBar(int totalCount, int newCount, int preparingCount) {
     return AppBar(
       backgroundColor: AppColors.surface,
       elevation: 0,
@@ -229,13 +243,13 @@ class _KitchenScreenV2State extends State<KitchenScreenV2>
           margin: const EdgeInsets.only(right: 8),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: _orders.isEmpty ? AppColors.successSurface : AppColors.warningSurface,
+            color: totalCount == 0 ? AppColors.successSurface : AppColors.warningSurface,
             borderRadius: AppSpacing.borderRadiusRound,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_orders.isNotEmpty)
+              if (totalCount > 0)
                 AnimatedBuilder(
                   animation: _pulseController,
                   builder: (context, child) {
@@ -253,9 +267,9 @@ class _KitchenScreenV2State extends State<KitchenScreenV2>
                   },
                 ),
               Text(
-                '${_orders.length} en cours',
+                '$totalCount en cours',
                 style: AppTypography.labelMedium.copyWith(
-                  color: _orders.isEmpty ? AppColors.success : AppColors.warning,
+                  color: totalCount == 0 ? AppColors.success : AppColors.warning,
                   fontWeight: FontWeight.bold,
                 ),
               ),

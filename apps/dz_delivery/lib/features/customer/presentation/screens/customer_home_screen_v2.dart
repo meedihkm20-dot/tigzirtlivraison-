@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
@@ -8,17 +9,18 @@ import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/design_system/components/loaders/skeleton_loader.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../providers/providers.dart';
 
 /// Écran d'accueil Client V2 - Premium
 /// Design moderne avec gradient teal, catégories, promos, recommandations
-class CustomerHomeScreenV2 extends StatefulWidget {
+class CustomerHomeScreenV2 extends ConsumerStatefulWidget {
   const CustomerHomeScreenV2({super.key});
 
   @override
-  State<CustomerHomeScreenV2> createState() => _CustomerHomeScreenV2State();
+  ConsumerState<CustomerHomeScreenV2> createState() => _CustomerHomeScreenV2State();
 }
 
-class _CustomerHomeScreenV2State extends State<CustomerHomeScreenV2> {
+class _CustomerHomeScreenV2State extends ConsumerState<CustomerHomeScreenV2> {
   bool _isLoading = true;
   int _currentNavIndex = 0;
   
@@ -29,7 +31,7 @@ class _CustomerHomeScreenV2State extends State<CustomerHomeScreenV2> {
   List<Map<String, dynamic>> _dailySpecials = [];
   List<Map<String, dynamic>> _categories = [];
   int _unreadNotifications = 0;
-  int _cartItemCount = 0;
+  // ✅ _cartItemCount supprimé - utiliser cartItemCountProvider
 
   final _searchController = TextEditingController();
 
@@ -95,6 +97,9 @@ class _CustomerHomeScreenV2State extends State<CustomerHomeScreenV2> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Utiliser le provider pour le nombre d'articles dans le panier
+    final cartItemCount = ref.watch(cartItemCountProvider);
+    
     return Scaffold(
       backgroundColor: AppColors.background,
       body: RefreshIndicator(
@@ -104,7 +109,7 @@ class _CustomerHomeScreenV2State extends State<CustomerHomeScreenV2> {
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             // Header avec gradient
-            _buildHeader(),
+            _buildHeader(cartItemCount),
             
             // Contenu
             if (_isLoading)
@@ -141,7 +146,7 @@ class _CustomerHomeScreenV2State extends State<CustomerHomeScreenV2> {
   // ============================================
   // HEADER AVEC GRADIENT TEAL
   // ============================================
-  Widget _buildHeader() {
+  Widget _buildHeader(int cartItemCount) {
     final firstName = _profile?['full_name']?.toString().split(' ').first ?? 'Client';
     final points = _loyalty?['points'] ?? 0;
 

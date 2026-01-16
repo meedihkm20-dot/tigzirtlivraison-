@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
 import '../../../../core/design_system/theme/app_spacing.dart';
@@ -8,26 +9,20 @@ import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/backend_api_service.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../providers/providers.dart';
 
 /// Écran Accueil Livreur V2 - Premium
 /// Stats temps réel, commandes disponibles, quick actions, gamification
-class LivreurHomeScreenV2 extends StatefulWidget {
+class LivreurHomeScreenV2 extends ConsumerStatefulWidget {
   const LivreurHomeScreenV2({super.key});
 
   @override
-  State<LivreurHomeScreenV2> createState() => _LivreurHomeScreenV2State();
+  ConsumerState<LivreurHomeScreenV2> createState() => _LivreurHomeScreenV2State();
 }
 
-class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
+class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
     with TickerProviderStateMixin {
   bool _isLoading = true;
-  bool _isOnline = false;
-  
-  Map<String, dynamic>? _profile;
-  Map<String, dynamic>? _todayStats;
-  Map<String, dynamic>? _tierInfo;
-  List<Map<String, dynamic>> _availableOrders = [];
-  Map<String, dynamic>? _currentDelivery;
   
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -58,24 +53,11 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final results = await Future.wait([
-        _safeCall(() => SupabaseService.getProfile(), null),
-        _safeCall(() => SupabaseService.getLivreurTodayStats(), <String, dynamic>{}),
-        _safeCall(() => SupabaseService.getLivreurTierInfo(), <String, dynamic>{}),
-        _safeCall(() => SupabaseService.getAvailableOrders(), <Map<String, dynamic>>[]),
-        _safeCall(() => SupabaseService.getCurrentDelivery(), null),
-      ]);
-
+      // ✅ Utiliser le provider pour charger les données
+      await ref.read(livreurProvider.notifier).loadAll();
+      
       if (mounted) {
-        setState(() {
-          _profile = results[0] as Map<String, dynamic>?;
-          _todayStats = results[1] as Map<String, dynamic>;
-          _tierInfo = results[2] as Map<String, dynamic>;
-          _availableOrders = results[3] as List<Map<String, dynamic>>;
-          _currentDelivery = results[4] as Map<String, dynamic>?;
-          _isOnline = _profile?['is_online'] ?? false;
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       debugPrint('Erreur chargement: $e');
@@ -83,23 +65,21 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
     }
   }
 
-  Future<T> _safeCall<T>(Future<T> Function() call, T defaultValue) async {
-    try {
-      return await call();
-    } catch (e) {
-      return defaultValue;
-    }
-  }
-
   void _subscribeToOrders() {
     _ordersSubscription = SupabaseService.subscribeToAvailableOrders().listen((orders) {
       if (mounted) {
-        setState(() => _availableOrders = orders);
+        // ✅ Mettre à jour via le provider
+        ref.read(livreurProvider.notifier).setAvailableOrders(orders);
       }
     });
   }
 
-  String get _tierName => _tierInfo?['tier'] ?? 'Bronze';
+  // ✅ Getters utilisant le provider
+  String get _tierName {
+    final tierInfo = ref.read(livreurProvider).tierInfo;
+    return tierInfo?['tier'] ?? 'Bronze';
+  }
+  
   Color get _tierColor {
     switch (_tierName.toLowerCase()) {
       case 'diamond': return AppColors.tierDiamond;
@@ -119,6 +99,11 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Utiliser le provider pour les données
+    final livreurState = ref.watch(livreurProvider);
+    final isOnline = livreurState.isOnline;
+    final currentDelivery = livreurState.currentDelivery;
+    
     return Scaffold(
       backgroundColor: AppColors.background,
       body: _isLoading
@@ -130,12 +115,12 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   _buildHeader(),
-                  SliverToBoxAdapter(child: _buildOnlineToggle()),
-                  if (_currentDelivery != null)
-                    SliverToBoxAdapter(child: _buildCurrentDelivery()),
+                  SliverToBoxAdapter(child: _buildOnlineToggle(isOnline)),
+                  if (currentDelivery != null)
+                    SliverToBoxAdapter(child: _buildCurrentDelivery(currentDelivery)),
                   SliverToBoxAdapter(child: _buildTodayStats()),
                   SliverToBoxAdapter(child: _buildQuickActions()),
-                  SliverToBoxAdapter(child: _buildAvailableOrders()),
+                  SliverToBoxAdapter(child: _buildAvailableOrders(isOnline)),
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
               ),
@@ -145,8 +130,10 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
   }
 
   Widget _buildHeader() {
-    final name = _profile?['full_name']?.toString().split(' ').first ?? 'Livreur';
-    final rating = (_profile?['rating'] as num?)?.toDouble() ?? 4.5;
+    final livreurState = ref.watch(livreurProvider);
+    final userProfile = livreurState.userProfile;
+    final name = userProfile?.fullName?.split(' ').first ?? 'Livreur';
+    final rating = livreurState.rating;
 
     return SliverAppBar(
       expandedHeight: 180,
@@ -250,15 +237,15 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
     );
   }
 
-  Widget _buildOnlineToggle() {
+  Widget _buildOnlineToggle(bool isOnline) {
     return Container(
       margin: AppSpacing.screen,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _isOnline ? AppColors.successSurface : AppColors.surface,
+        color: isOnline ? AppColors.successSurface : AppColors.surface,
         borderRadius: AppSpacing.borderRadiusLg,
         border: Border.all(
-          color: _isOnline ? AppColors.success : AppColors.outline,
+          color: isOnline ? AppColors.success : AppColors.outline,
           width: 2,
         ),
         boxShadow: AppShadows.md,
@@ -268,16 +255,16 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
           AnimatedBuilder(
             animation: _pulseAnimation,
             builder: (context, child) => Transform.scale(
-              scale: _isOnline ? _pulseAnimation.value : 1.0,
+              scale: isOnline ? _pulseAnimation.value : 1.0,
               child: Container(
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: _isOnline ? AppColors.success : AppColors.textTertiary,
+                  color: isOnline ? AppColors.success : AppColors.textTertiary,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  _isOnline ? Icons.delivery_dining : Icons.delivery_dining_outlined,
+                  isOnline ? Icons.delivery_dining : Icons.delivery_dining_outlined,
                   color: Colors.white,
                   size: 28,
                 ),
@@ -290,13 +277,13 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _isOnline ? 'Vous êtes en ligne' : 'Vous êtes hors ligne',
+                  isOnline ? 'Vous êtes en ligne' : 'Vous êtes hors ligne',
                   style: AppTypography.titleSmall.copyWith(
-                    color: _isOnline ? AppColors.success : AppColors.textPrimary,
+                    color: isOnline ? AppColors.success : AppColors.textPrimary,
                   ),
                 ),
                 Text(
-                  _isOnline 
+                  isOnline 
                       ? 'Prêt à recevoir des commandes'
                       : 'Activez pour recevoir des commandes',
                   style: AppTypography.bodySmall.copyWith(color: AppColors.textTertiary),
@@ -305,7 +292,7 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
             ),
           ),
           Switch(
-            value: _isOnline,
+            value: isOnline,
             onChanged: _toggleOnline,
             activeColor: AppColors.success,
             activeTrackColor: AppColors.success.withOpacity(0.3),
@@ -315,18 +302,16 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
     );
   }
 
-  Widget _buildCurrentDelivery() {
-    if (_currentDelivery == null) return const SizedBox.shrink();
-    
-    final restaurantName = _currentDelivery!['restaurant_name'] ?? 'Restaurant';
-    final customerAddress = _currentDelivery!['delivery_address'] ?? 'Adresse';
-    final status = _currentDelivery!['status'] ?? 'picked_up';
+  Widget _buildCurrentDelivery(Map<String, dynamic> currentDelivery) {
+    final restaurantName = currentDelivery['restaurant_name'] ?? 'Restaurant';
+    final customerAddress = currentDelivery['delivery_address'] ?? 'Adresse';
+    final status = currentDelivery['status'] ?? 'picked_up';
 
     return GestureDetector(
       onTap: () => Navigator.pushNamed(
         context, 
         AppRouter.delivery, 
-        arguments: _currentDelivery!['id'],
+        arguments: currentDelivery['id'],
       ),
       child: Container(
         margin: AppSpacing.screenHorizontal,
@@ -403,10 +388,11 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
   }
 
   Widget _buildTodayStats() {
-    final deliveries = _todayStats?['deliveries'] ?? 0;
-    final earnings = (_todayStats?['earnings'] as num?)?.toDouble() ?? 0;
-    final tips = (_todayStats?['tips'] as num?)?.toDouble() ?? 0;
-    final distance = (_todayStats?['distance'] as num?)?.toDouble() ?? 0;
+    final todayStats = ref.watch(livreurProvider).todayStats;
+    final deliveries = todayStats?['deliveries'] ?? 0;
+    final earnings = (todayStats?['earnings'] as num?)?.toDouble() ?? 0;
+    final tips = (todayStats?['tips'] as num?)?.toDouble() ?? 0;
+    final distance = (todayStats?['distance'] as num?)?.toDouble() ?? 0;
 
     return Padding(
       padding: AppSpacing.screen,
@@ -531,7 +517,9 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
   }
 
 
-  Widget _buildAvailableOrders() {
+  Widget _buildAvailableOrders(bool isOnline) {
+    final availableOrders = ref.watch(livreurProvider).availableOrders;
+    
     return Padding(
       padding: AppSpacing.screen,
       child: Column(
@@ -548,7 +536,7 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '${_availableOrders.length}',
+                  '${availableOrders.length}',
                   style: AppTypography.labelMedium.copyWith(
                     color: AppColors.livreurPrimary,
                     fontWeight: FontWeight.bold,
@@ -558,7 +546,7 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
             ],
           ),
           const SizedBox(height: 12),
-          if (!_isOnline)
+          if (!isOnline)
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -579,7 +567,7 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
                 ),
               ),
             )
-          else if (_availableOrders.isEmpty)
+          else if (availableOrders.isEmpty)
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -606,7 +594,7 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
               ),
             )
           else
-            ..._availableOrders.map((order) => _buildOrderCard(order)),
+            ...availableOrders.map((order) => _buildOrderCard(order)),
         ],
       ),
     );
@@ -816,11 +804,12 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
 
   void _toggleOnline(bool value) async {
     HapticFeedback.mediumImpact();
-    setState(() => _isOnline = value);
     
     try {
-      await SupabaseService.setLivreurOnlineStatus(value);
-      if (value) {
+      // ✅ Utiliser le provider pour toggle online
+      await ref.read(livreurProvider.notifier).toggleOnline(value);
+      
+      if (value && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Vous êtes maintenant en ligne! 🚀'),
@@ -829,10 +818,11 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
         );
       }
     } catch (e) {
-      setState(() => _isOnline = !value);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e'), backgroundColor: AppColors.error),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: AppColors.error),
+        );
+      }
     }
   }
 

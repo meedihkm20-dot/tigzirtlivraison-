@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
@@ -9,25 +10,23 @@ import '../../../../core/design_system/components/loaders/skeleton_loader.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/backend_api_service.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../providers/providers.dart';
 
 /// Écran Panier V2 - Premium
 /// Panier intelligent avec suggestions, promos, pourboire, multi-adresses
-class CartScreenV2 extends StatefulWidget {
+class CartScreenV2 extends ConsumerStatefulWidget {
   const CartScreenV2({super.key});
 
   @override
-  State<CartScreenV2> createState() => _CartScreenV2State();
+  ConsumerState<CartScreenV2> createState() => _CartScreenV2State();
 }
 
-class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMixin {
+class _CartScreenV2State extends ConsumerState<CartScreenV2> with TickerProviderStateMixin {
   bool _isLoading = true;
   bool _isProcessing = false;
   
-  List<Map<String, dynamic>> _cartItems = [];
+  // Le panier vient du provider global
   List<Map<String, dynamic>> _suggestions = [];
-  Map<String, dynamic>? _restaurant;
-  Map<String, dynamic>? _selectedAddress;
-  List<Map<String, dynamic>> _addresses = [];
   
   String? _promoCode;
   double _promoDiscount = 0;
@@ -72,15 +71,11 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      // Le panier est géré en state local - pas de table cart_items en base
-      // On charge seulement les adresses sauvegardées
-      final addresses = await _safeCall(() => SupabaseService.getSavedAddresses(), <Map<String, dynamic>>[]);
+      // Charger les adresses via le provider
+      await ref.read(addressesProvider.notifier).loadAddresses();
 
       if (mounted) {
         setState(() {
-          // _cartItems est passé via arguments ou géré localement
-          _addresses = addresses;
-          _selectedAddress = addresses.isNotEmpty ? addresses.first : null;
           _isLoading = false;
         });
       }
@@ -99,11 +94,7 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
     }
   }
 
-  double get _subtotal => _cartItems.fold(0.0, (sum, item) {
-    final price = (item['price'] as num?)?.toDouble() ?? 0;
-    final qty = (item['quantity'] as num?)?.toInt() ?? 1;
-    return sum + (price * qty);
-  });
+  double get _subtotal => ref.watch(cartSubtotalProvider);
 
   double get _deliveryFee => _subtotal >= 2000 ? 0 : 200;
   
@@ -118,19 +109,23 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
+    final cartState = ref.watch(cartProvider);
+    final cartItems = cartState.items;
+    final isEmpty = cartItems.isEmpty;
+    
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(cartItems.length),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.clientPrimary))
-          : _cartItems.isEmpty
+          : isEmpty
               ? _buildEmptyCart()
-              : _buildCartContent(),
-      bottomNavigationBar: _cartItems.isNotEmpty ? _buildCheckoutBar() : null,
+              : _buildCartContent(cartItems),
+      bottomNavigationBar: !isEmpty ? _buildCheckoutBar() : null,
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(int itemCount) {
     return AppBar(
       backgroundColor: AppColors.surface,
       elevation: 0,
@@ -142,15 +137,15 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Mon panier', style: AppTypography.titleMedium),
-          if (_cartItems.isNotEmpty)
+          if (itemCount > 0)
             Text(
-              '${_cartItems.length} article${_cartItems.length > 1 ? 's' : ''}',
+              '$itemCount article${itemCount > 1 ? 's' : ''}',
               style: AppTypography.bodySmall.copyWith(color: AppColors.textTertiary),
             ),
         ],
       ),
       actions: [
-        if (_cartItems.isNotEmpty)
+        if (itemCount > 0)
           TextButton(
             onPressed: _clearCart,
             child: Text(
@@ -212,20 +207,22 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
     );
   }
 
-  Widget _buildCartContent() {
+  Widget _buildCartContent(List<CartItem> cartItems) {
+    final cartState = ref.watch(cartProvider);
+    
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Restaurant info
-          _buildRestaurantHeader(),
+          _buildRestaurantHeader(cartState),
           
           // Cart items
-          _buildCartItems(),
+          _buildCartItems(cartItems),
           
           // Add more items
-          _buildAddMoreButton(),
+          _buildAddMoreButton(cartState),
           
           // Suggestions
           if (_suggestions.isNotEmpty) _buildSuggestions(),
@@ -257,10 +254,9 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
     );
   }
 
-  Widget _buildRestaurantHeader() {
-    if (_cartItems.isEmpty) return const SizedBox.shrink();
-    final item = _cartItems.first;
-    final restaurantName = item['restaurant_name'] ?? 'Restaurant';
+  Widget _buildRestaurantHeader(CartState cartState) {
+    if (cartState.isEmpty) return const SizedBox.shrink();
+    final restaurantName = cartState.currentRestaurantName ?? 'Restaurant';
 
     return Container(
       margin: AppSpacing.screen,
@@ -331,21 +327,21 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
     );
   }
 
-  Widget _buildCartItems() {
+  Widget _buildCartItems(List<CartItem> cartItems) {
     return Padding(
       padding: AppSpacing.screenHorizontal,
       child: Column(
-        children: _cartItems.map((item) => _buildCartItem(item)).toList(),
+        children: cartItems.map((item) => _buildCartItem(item)).toList(),
       ),
     );
   }
 
-  Widget _buildCartItem(Map<String, dynamic> item) {
-    final price = (item['price'] as num?)?.toDouble() ?? 0;
-    final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+  Widget _buildCartItem(CartItem item) {
+    final price = item.price;
+    final qty = item.quantity;
 
     return Dismissible(
-      key: Key(item['id'].toString()),
+      key: Key(item.menuItemId),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
@@ -356,7 +352,7 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
         ),
         child: const Icon(Icons.delete, color: Colors.white),
       ),
-      onDismissed: (_) => _removeItem(item['id']),
+      onDismissed: (_) => _removeItem(item.menuItemId),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
@@ -370,9 +366,9 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
             // Image
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: item['image_url'] != null
+              child: item.imageUrl != null
                   ? CachedNetworkImage(
-                      imageUrl: item['image_url'],
+                      imageUrl: item.imageUrl!,
                       width: 70,
                       height: 70,
                       fit: BoxFit.cover,
@@ -388,15 +384,15 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item['name'] ?? '',
+                    item.name,
                     style: AppTypography.titleSmall,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (item['options'] != null) ...[
+                  if (item.specialInstructions != null) ...[
                     const SizedBox(height: 4),
                     Text(
-                      item['options'],
+                      item.specialInstructions!,
                       style: AppTypography.bodySmall.copyWith(color: AppColors.textTertiary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -433,7 +429,7 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
     );
   }
 
-  Widget _buildQuantityControls(Map<String, dynamic> item, int qty) {
+  Widget _buildQuantityControls(CartItem item, int qty) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceVariant,
@@ -448,7 +444,7 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
               size: 18,
               color: qty > 1 ? AppColors.textPrimary : AppColors.error,
             ),
-            onPressed: () => _updateQuantity(item['id'], qty - 1),
+            onPressed: () => _updateQuantity(item.menuItemId, qty - 1),
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           ),
           AnimatedBuilder(
@@ -463,7 +459,7 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
           ),
           IconButton(
             icon: const Icon(Icons.add, size: 18),
-            onPressed: () => _updateQuantity(item['id'], qty + 1),
+            onPressed: () => _updateQuantity(item.menuItemId, qty + 1),
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           ),
         ],
@@ -471,11 +467,18 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
     );
   }
 
-  Widget _buildAddMoreButton() {
+  Widget _buildAddMoreButton(CartState cartState) {
     return Padding(
       padding: AppSpacing.screen,
       child: OutlinedButton.icon(
-        onPressed: () => Navigator.pop(context),
+        onPressed: () {
+          // Retourner au restaurant actuel si possible
+          if (cartState.currentRestaurantId != null) {
+            Navigator.pushNamed(context, AppRouter.restaurantDetail, arguments: cartState.currentRestaurantId);
+          } else {
+            Navigator.pop(context);
+          }
+        },
         icon: const Icon(Icons.add, color: AppColors.clientPrimary),
         label: Text(
           'Ajouter d\'autres articles',
@@ -582,6 +585,9 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
 
 
   Widget _buildDeliverySection() {
+    // ✅ Utiliser le provider pour l'adresse sélectionnée
+    final selectedAddress = ref.watch(selectedAddressProvider);
+    
     return Container(
       margin: AppSpacing.screen,
       padding: const EdgeInsets.all(16),
@@ -608,7 +614,7 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
             ],
           ),
           const SizedBox(height: 16),
-          if (_selectedAddress != null)
+          if (selectedAddress != null)
             GestureDetector(
               onTap: _showAddressSelector,
               child: Container(
@@ -627,20 +633,20 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
                           Row(
                             children: [
                               Icon(
-                                _selectedAddress!['type'] == 'home' ? Icons.home : Icons.work,
+                                selectedAddress.typeIcon == 'home' ? Icons.home : Icons.work,
                                 size: 16,
                                 color: AppColors.clientPrimary,
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                _selectedAddress!['label'] ?? 'Adresse',
+                                selectedAddress.label,
                                 style: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _selectedAddress!['address'] ?? '',
+                            selectedAddress.address,
                             style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -1235,31 +1241,23 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
   // ACTIONS
   // ============================================
   
-  void _updateQuantity(String itemId, int newQty) async {
+  void _updateQuantity(String menuItemId, int newQty) async {
     HapticFeedback.lightImpact();
     _bounceController.forward().then((_) => _bounceController.reverse());
     
     if (newQty <= 0) {
-      _removeItem(itemId);
+      _removeItem(menuItemId);
       return;
     }
     
-    setState(() {
-      final index = _cartItems.indexWhere((i) => i['id'] == itemId);
-      if (index != -1) {
-        _cartItems[index]['quantity'] = newQty;
-      }
-    });
-    
-    // Panier géré en state local uniquement
+    // Utiliser le provider
+    ref.read(cartProvider.notifier).updateQuantity(menuItemId, newQty);
   }
 
-  void _removeItem(String itemId) async {
+  void _removeItem(String menuItemId) async {
     HapticFeedback.mediumImpact();
-    setState(() {
-      _cartItems.removeWhere((i) => i['id'] == itemId);
-    });
-    // Panier géré en state local uniquement
+    // Utiliser le provider
+    ref.read(cartProvider.notifier).removeItem(menuItemId);
   }
 
   void _clearCart() async {
@@ -1280,33 +1278,27 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
     );
     
     if (confirm == true) {
-      setState(() => _cartItems.clear());
-      // Panier géré en state local uniquement
+      // Utiliser le provider
+      ref.read(cartProvider.notifier).clear();
     }
   }
 
   void _addSuggestion(Map<String, dynamic> item) async {
     HapticFeedback.lightImpact();
-    // Ajouter directement au state local
-    setState(() {
-      final existingIndex = _cartItems.indexWhere((i) => i['menu_item_id'] == item['id']);
-      if (existingIndex != -1) {
-        _cartItems[existingIndex]['quantity'] = (_cartItems[existingIndex]['quantity'] ?? 1) + 1;
-      } else {
-        _cartItems.add({
-          'id': DateTime.now().millisecondsSinceEpoch.toString(),
-          'menu_item_id': item['id'],
-          'name': item['name'],
-          'price': item['price'],
-          'image_url': item['image_url'],
-          'restaurant_id': item['restaurant_id'],
-          'quantity': 1,
-        });
-      }
-    });
+    final cartState = ref.read(cartProvider);
+    // Utiliser le provider
+    ref.read(cartProvider.notifier).addFromMenuItem(
+      item,
+      cartState.currentRestaurantId ?? '',
+      cartState.currentRestaurantName ?? '',
+    );
   }
 
   void _showAddressSelector() {
+    final addressesState = ref.watch(addressesProvider);
+    final addresses = addressesState.addresses;
+    final selectedAddress = addressesState.selectedAddress;
+    
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
@@ -1321,18 +1313,18 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
           children: [
             Text('Choisir une adresse', style: AppTypography.titleMedium),
             const SizedBox(height: 16),
-            ..._addresses.map((addr) => ListTile(
+            ...addresses.map((addr) => ListTile(
               leading: Icon(
-                addr['type'] == 'home' ? Icons.home : Icons.work,
+                addr.typeIcon == 'home' ? Icons.home : Icons.work,
                 color: AppColors.clientPrimary,
               ),
-              title: Text(addr['label'] ?? 'Adresse'),
-              subtitle: Text(addr['address'] ?? ''),
-              trailing: _selectedAddress?['id'] == addr['id']
+              title: Text(addr.label),
+              subtitle: Text(addr.address),
+              trailing: selectedAddress?.id == addr.id
                   ? const Icon(Icons.check_circle, color: AppColors.clientPrimary)
                   : null,
               onTap: () {
-                setState(() => _selectedAddress = addr);
+                ref.read(addressesProvider.notifier).selectAddress(addr);
                 Navigator.pop(ctx);
               },
             )),
@@ -1401,9 +1393,20 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
   }
 
   void _placeOrder() async {
-    if (_selectedAddress == null) {
+    // ✅ Utiliser les providers pour le panier et l'adresse
+    final cartState = ref.read(cartProvider);
+    final selectedAddress = ref.read(selectedAddressProvider);
+    
+    if (selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Veuillez sélectionner une adresse de livraison')),
+      );
+      return;
+    }
+
+    if (cartState.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Votre panier est vide')),
       );
       return;
     }
@@ -1412,35 +1415,30 @@ class _CartScreenV2State extends State<CartScreenV2> with TickerProviderStateMix
     HapticFeedback.heavyImpact();
 
     try {
-      // Calculate totals
-      final subtotal = _cartItems.fold<double>(0, (sum, item) => 
-        sum + ((item['price'] as num).toDouble() * (item['quantity'] as int)));
-      final deliveryFee = _deliveryFee - _promoDiscount;
-      final tip = _tipAmount;
-      final total = subtotal + deliveryFee + tip;
-      
-      final restaurantId = _cartItems.isNotEmpty ? _cartItems.first['restaurant_id'] : '';
+      final restaurantId = cartState.currentRestaurantId ?? '';
       
       // ✅ MIGRATION: Utiliser le backend au lieu de Supabase direct
       final backendApi = BackendApiService(SupabaseService.client);
       
+      // ✅ Utiliser les noms de colonnes corrects (SOURCE_DE_VERITE.sql)
+      // delivery_latitude, delivery_longitude (PAS delivery_lat/lng)
       final orderResponse = await backendApi.createOrder(
         restaurantId: restaurantId,
-        items: _cartItems.map((item) => {
-          'menu_item_id': item['menu_item_id'] ?? item['id'],
-          'quantity': item['quantity'],
+        items: cartState.items.map((item) => {
+          'menu_item_id': item.menuItemId,
+          'quantity': item.quantity,
         }).toList(),
-        deliveryAddress: _selectedAddress!['address'] ?? '',
-        deliveryLat: (_selectedAddress!['lat'] as num?)?.toDouble() ?? 0,
-        deliveryLng: (_selectedAddress!['lng'] as num?)?.toDouble() ?? 0,
+        deliveryAddress: selectedAddress.address,
+        deliveryLat: selectedAddress.latitude,  // Backend convertit en delivery_latitude
+        deliveryLng: selectedAddress.longitude, // Backend convertit en delivery_longitude
         notes: _orderNote,
       );
 
       final order = orderResponse['order'];
 
       if (mounted) {
-        // Clear cart (state local) and navigate to tracking
-        setState(() => _cartItems.clear());
+        // ✅ Vider le panier via le provider
+        ref.read(cartProvider.notifier).clear();
         Navigator.pushReplacementNamed(
           context,
           AppRouter.orderTracking,

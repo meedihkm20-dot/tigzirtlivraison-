@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../providers/providers.dart';
 
-class SavedAddressesScreen extends StatefulWidget {
+class SavedAddressesScreen extends ConsumerStatefulWidget {
   const SavedAddressesScreen({super.key});
 
   @override
-  State<SavedAddressesScreen> createState() => _SavedAddressesScreenState();
+  ConsumerState<SavedAddressesScreen> createState() => _SavedAddressesScreenState();
 }
 
-class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
-  List<Map<String, dynamic>> _addresses = [];
+class _SavedAddressesScreenState extends ConsumerState<SavedAddressesScreen> {
   bool _isLoading = true;
 
   @override
@@ -23,11 +24,9 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
   Future<void> _loadAddresses() async {
     setState(() => _isLoading = true);
     try {
-      final addresses = await SupabaseService.getSavedAddresses();
-      setState(() {
-        _addresses = addresses;
-        _isLoading = false;
-      });
+      // ✅ Utiliser le provider pour charger les adresses
+      await ref.read(addressesProvider.notifier).loadAddresses();
+      setState(() => _isLoading = false);
     } catch (e) {
       setState(() => _isLoading = false);
     }
@@ -38,7 +37,8 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
     final addressController = TextEditingController();
     final instructionsController = TextEditingController();
     double? lat, lng;
-    bool isDefault = _addresses.isEmpty;
+    final addressesState = ref.read(addressesProvider);
+    bool isDefault = addressesState.isEmpty;
 
     showModalBottomSheet(
       context: context,
@@ -162,7 +162,8 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                       );
                       
                       Navigator.pop(context);
-                      _loadAddresses();
+                      // ✅ Rafraîchir via le provider
+                      ref.read(addressesProvider.notifier).refresh();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Adresse ajoutée!'), backgroundColor: Colors.green),
                       );
@@ -189,6 +190,10 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Utiliser le provider pour les adresses
+    final addressesState = ref.watch(addressesProvider);
+    final addresses = addressesState.addresses;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mes Adresses'),
@@ -201,7 +206,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _addresses.isEmpty
+          : addresses.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -222,13 +227,13 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                   onRefresh: _loadAddresses,
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: _addresses.length,
+                    itemCount: addresses.length,
                     itemBuilder: (context, index) {
-                      final address = _addresses[index];
-                      final isDefault = address['is_default'] == true;
+                      final address = addresses[index];
+                      final isDefault = address.isDefault;
                       
                       return Dismissible(
-                        key: Key(address['id']),
+                        key: Key(address.id),
                         direction: DismissDirection.endToStart,
                         background: Container(
                           alignment: Alignment.centerRight,
@@ -237,8 +242,9 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                           child: const Icon(Icons.delete, color: Colors.white),
                         ),
                         onDismissed: (_) async {
-                          await SupabaseService.deleteSavedAddress(address['id']);
-                          _loadAddresses();
+                          await SupabaseService.deleteSavedAddress(address.id);
+                          // ✅ Supprimer via le provider
+                          ref.read(addressesProvider.notifier).removeAddress(address.id);
                         },
                         child: Card(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -248,14 +254,14 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                   ? AppTheme.primaryColor.withValues(alpha: 0.1)
                                   : Colors.grey[100],
                               child: Icon(
-                                _getLabelIcon(address['label'] ?? ''),
+                                _getLabelIcon(address.label),
                                 color: isDefault ? AppTheme.primaryColor : Colors.grey,
                               ),
                             ),
                             title: Row(
                               children: [
                                 Text(
-                                  address['label'] ?? 'Adresse',
+                                  address.label,
                                   style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
                                 if (isDefault) ...[
@@ -277,18 +283,19 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(address['address'] ?? ''),
-                                if (address['instructions'] != null)
+                                Text(address.address),
+                                if (address.instructions != null)
                                   Text(
-                                    address['instructions'],
+                                    address.instructions!,
                                     style: TextStyle(color: Colors.grey[500], fontSize: 12, fontStyle: FontStyle.italic),
                                   ),
                               ],
                             ),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () {
-                              // Retourner l'adresse sélectionnée
-                              Navigator.pop(context, address);
+                              // ✅ Sélectionner l'adresse via le provider et retourner
+                              ref.read(addressesProvider.notifier).selectAddress(address);
+                              Navigator.pop(context, address.toJson());
                             },
                           ),
                         ),
@@ -296,7 +303,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                     },
                   ),
                 ),
-      floatingActionButton: _addresses.isNotEmpty
+      floatingActionButton: addresses.isNotEmpty
           ? FloatingActionButton(
               onPressed: _showAddAddressDialog,
               child: const Icon(Icons.add),
