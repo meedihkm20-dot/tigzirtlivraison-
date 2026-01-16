@@ -49,12 +49,16 @@ coverage/
 .tmp/
 supabase/.temp/
 
-# Documentation locale (ne pas pousser sur GitHub)
+# Documentation locale et fichiers de debug (ne pas pousser sur GitHub)
 PLAN_TEST_MANUEL.md
 AUDIT_CODE_FONCTIONNALITES.md
 AUDIT_COMPLET_2025.md
 BUGS_RAPPORT.md
 MIGRATION_SUPABASE_TO_BACKEND.md
+DIAGNOSTIC_RESTAURANT_LOGIN.md
+FLUX_COMMANDE_CORRIGE.md
+debug_*.sql
+fix_*.sql
 supabase/update_admin_password.sql
 supabase/change_admin_password_mehdi.sql
 supabase/debug_admin_account.sql
