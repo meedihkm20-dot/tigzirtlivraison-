@@ -21,36 +21,55 @@ class _SplashScreenState extends State<SplashScreen> {
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
 
-    if (!SupabaseService.isLoggedIn) {
-      Navigator.pushReplacementNamed(context, AppRouter.login);
-      return;
-    }
-
-    // Récupérer le rôle et rediriger
-    final role = await SupabaseService.getUserRole();
-    
-    switch (role) {
-      case 'customer':
-        Navigator.pushReplacementNamed(context, AppRouter.customerHome);
-        break;
-      case 'restaurant':
-        final isVerified = await SupabaseService.isRestaurantVerified();
-        if (isVerified) {
-          Navigator.pushReplacementNamed(context, AppRouter.restaurantHome);
-        } else {
-          Navigator.pushReplacementNamed(context, AppRouter.pendingApproval, arguments: 'restaurant');
-        }
-        break;
-      case 'livreur':
-        final isVerified = await SupabaseService.isLivreurVerified();
-        if (isVerified) {
-          Navigator.pushReplacementNamed(context, AppRouter.livreurHome);
-        } else {
-          Navigator.pushReplacementNamed(context, AppRouter.pendingApproval, arguments: 'livreur');
-        }
-        break;
-      default:
+    try {
+      if (!SupabaseService.isLoggedIn) {
         Navigator.pushReplacementNamed(context, AppRouter.login);
+        return;
+      }
+
+      // Récupérer le rôle et rediriger
+      final role = await SupabaseService.getUserRole();
+      
+      if (role == null) {
+        // Profil introuvable → déconnecter et retourner au login
+        await SupabaseService.signOut();
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, AppRouter.login);
+        return;
+      }
+      
+      switch (role) {
+        case 'customer':
+          Navigator.pushReplacementNamed(context, AppRouter.customerHome);
+          break;
+        case 'restaurant':
+          final isVerified = await SupabaseService.isRestaurantVerified();
+          if (isVerified) {
+            Navigator.pushReplacementNamed(context, AppRouter.restaurantHome);
+          } else {
+            Navigator.pushReplacementNamed(context, AppRouter.pendingApproval, arguments: 'restaurant');
+          }
+          break;
+        case 'livreur':
+          final isVerified = await SupabaseService.isLivreurVerified();
+          if (isVerified) {
+            Navigator.pushReplacementNamed(context, AppRouter.livreurHome);
+          } else {
+            Navigator.pushReplacementNamed(context, AppRouter.pendingApproval, arguments: 'livreur');
+          }
+          break;
+        default:
+          // Rôle inconnu → déconnecter
+          await SupabaseService.signOut();
+          if (!mounted) return;
+          Navigator.pushReplacementNamed(context, AppRouter.login);
+      }
+    } catch (e) {
+      // En cas d'erreur → déconnecter et retourner au login
+      debugPrint('Erreur splash: $e');
+      await SupabaseService.signOut();
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, AppRouter.login);
     }
   }
 

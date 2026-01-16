@@ -101,15 +101,25 @@ class SupabaseService {
 
   /// Récupère le rôle de l'utilisateur connecté
   static Future<String?> getUserRole() async {
-    if (currentUser == null) return null;
-    final profile = await client.from('profiles').select('role').eq('id', currentUser!.id).single();
-    return profile['role'] as String?;
+    try {
+      if (currentUser == null) return null;
+      final profile = await client.from('profiles').select('role').eq('id', currentUser!.id).maybeSingle();
+      return profile?['role'] as String?;
+    } catch (e) {
+      debugPrint('Erreur getUserRole: $e');
+      return null;
+    }
   }
 
   /// Récupère le profil complet
   static Future<Map<String, dynamic>?> getProfile() async {
-    if (currentUser == null) return null;
-    return await client.from('profiles').select().eq('id', currentUser!.id).single();
+    try {
+      if (currentUser == null) return null;
+      return await client.from('profiles').select().eq('id', currentUser!.id).maybeSingle();
+    } catch (e) {
+      debugPrint('Erreur getProfile: $e');
+      return null;
+    }
   }
 
   // ============================================
