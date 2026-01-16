@@ -265,8 +265,8 @@ class _CustomerHomeScreenV2State extends ConsumerState<CustomerHomeScreenV2> {
   Widget _buildSearchBar() {
     return GestureDetector(
       onTap: () {
-        // TODO: Navigate to search screen
         HapticFeedback.lightImpact();
+        Navigator.pushNamed(context, AppRouter.search);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -328,7 +328,9 @@ class _CustomerHomeScreenV2State extends ConsumerState<CustomerHomeScreenV2> {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        // TODO: Filter by category
+        Navigator.pushNamed(context, AppRouter.search, arguments: {
+          'category': category['name'],
+        });
       },
       child: Container(
         width: 75,
@@ -977,6 +979,9 @@ class _CustomerHomeScreenV2State extends ConsumerState<CustomerHomeScreenV2> {
         HapticFeedback.selectionClick();
         setState(() => _currentNavIndex = index);
         switch (index) {
+          case 1:
+            Navigator.pushNamed(context, AppRouter.search);
+            break;
           case 2:
             Navigator.pushNamed(context, AppRouter.customerOrders);
             break;

@@ -20,6 +20,7 @@ import '../../features/customer/presentation/screens/customer_home_screen_v2.dar
 import '../../features/customer/presentation/screens/cart_screen_v2.dart';
 import '../../features/customer/presentation/screens/order_tracking_screen_v2.dart';
 import '../../features/customer/presentation/screens/customer_profile_screen_v2.dart';
+import '../../features/customer/presentation/screens/search_screen_v2.dart';
 // Restaurant
 import '../../features/restaurant/presentation/screens/restaurant_dashboard_screen.dart';
 import '../../features/restaurant/presentation/screens/kitchen_screen_v2.dart';
@@ -57,6 +58,7 @@ class AppRouter {
   static const String orderTracking = '/customer/order-tracking';
   static const String customerProfile = '/customer/profile';
   static const String review = '/customer/review';
+  static const String search = '/customer/search';
   
   // Restaurant
   static const String restaurantHome = '/restaurant/home';
@@ -117,6 +119,12 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => OrderTrackingScreenV2(orderId: orderId));
       case customerProfile:
         return MaterialPageRoute(builder: (_) => const CustomerProfileScreenV2());
+      case search:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(builder: (_) => SearchScreenV2(
+          initialQuery: args?['query'],
+          categoryFilter: args?['category'],
+        ));
       
       // Restaurant
       case restaurantHome:
