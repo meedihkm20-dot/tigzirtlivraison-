@@ -23,7 +23,7 @@ import '../core/models/database_models.dart';
 class LivreurState {
   final LivreurModel? profile;
   final ProfileModel? userProfile;
-  final Map<String, dynamic>? currentDelivery;
+  final List<Map<String, dynamic>> currentDeliveries;  // ✅ Changé en liste
   final List<Map<String, dynamic>> availableOrders;
   final Map<String, dynamic>? todayStats;
   final Map<String, dynamic>? tierInfo;
@@ -34,7 +34,7 @@ class LivreurState {
   const LivreurState({
     this.profile,
     this.userProfile,
-    this.currentDelivery,
+    this.currentDeliveries = const [],  // ✅ Liste vide par défaut
     this.availableOrders = const [],
     this.todayStats,
     this.tierInfo,
@@ -43,7 +43,8 @@ class LivreurState {
     this.error,
   });
 
-  bool get hasCurrentDelivery => currentDelivery != null;
+  bool get hasCurrentDelivery => currentDeliveries.isNotEmpty;  // ✅ Vérifie si liste non vide
+  Map<String, dynamic>? get currentDelivery => currentDeliveries.isEmpty ? null : currentDeliveries.first;  // ✅ Compatibilité
   String? get livreurId => profile?.id;
   double get rating => profile?.rating ?? 5.0;
   int get totalDeliveries => profile?.totalDeliveries ?? 0;
@@ -53,7 +54,7 @@ class LivreurState {
   LivreurState copyWith({
     LivreurModel? profile,
     ProfileModel? userProfile,
-    Map<String, dynamic>? currentDelivery,
+    List<Map<String, dynamic>>? currentDeliveries,  // ✅ Changé en liste
     List<Map<String, dynamic>>? availableOrders,
     Map<String, dynamic>? todayStats,
     Map<String, dynamic>? tierInfo,
@@ -64,7 +65,7 @@ class LivreurState {
     return LivreurState(
       profile: profile ?? this.profile,
       userProfile: userProfile ?? this.userProfile,
-      currentDelivery: currentDelivery ?? this.currentDelivery,
+      currentDeliveries: currentDeliveries ?? this.currentDeliveries,  // ✅ Liste
       availableOrders: availableOrders ?? this.availableOrders,
       todayStats: todayStats ?? this.todayStats,
       tierInfo: tierInfo ?? this.tierInfo,
@@ -88,7 +89,7 @@ class LivreurNotifier extends Notifier<LivreurState> {
       final results = await Future.wait([
         SupabaseService.getLivreurProfile(),
         SupabaseService.getProfile(),
-        _safeCall(() => SupabaseService.getCurrentDelivery(), null),
+        _safeCall(() => SupabaseService.getCurrentDeliveries(), <Map<String, dynamic>>[]),  // ✅ Liste
         _safeCall(() => SupabaseService.getAvailableOrders(), <Map<String, dynamic>>[]),
         _safeCall(() => SupabaseService.getLivreurTodayStats(), <String, dynamic>{}),
         _safeCall(() => SupabaseService.getLivreurTierInfo(), <String, dynamic>{}),
@@ -100,7 +101,7 @@ class LivreurNotifier extends Notifier<LivreurState> {
       state = LivreurState(
         profile: livreurData != null ? LivreurModel.fromJson(livreurData) : null,
         userProfile: profileData != null ? ProfileModel.fromJson(profileData) : null,
-        currentDelivery: results[2] as Map<String, dynamic>?,
+        currentDeliveries: results[2] as List<Map<String, dynamic>>,  // ✅ Liste
         availableOrders: results[3] as List<Map<String, dynamic>>,
         todayStats: results[4] as Map<String, dynamic>,
         tierInfo: results[5] as Map<String, dynamic>,
@@ -139,9 +140,18 @@ class LivreurNotifier extends Notifier<LivreurState> {
     }
   }
 
-  /// Mettre à jour la livraison en cours
+  /// Mettre à jour les livraisons en cours
+  void setCurrentDeliveries(List<Map<String, dynamic>> deliveries) {
+    state = state.copyWith(currentDeliveries: deliveries);
+  }
+  
+  /// Compatibilité : mettre à jour une seule livraison
   void setCurrentDelivery(Map<String, dynamic>? delivery) {
-    state = state.copyWith(currentDelivery: delivery);
+    if (delivery == null) {
+      state = state.copyWith(currentDeliveries: []);
+    } else {
+      state = state.copyWith(currentDeliveries: [delivery]);
+    }
   }
 
   /// Mettre à jour les commandes disponibles

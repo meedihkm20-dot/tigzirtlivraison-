@@ -1540,19 +1540,23 @@ class SupabaseService {
     await setOnlineStatus(isOnline);
   }
 
-  static Future<Map<String, dynamic>?> getCurrentDelivery() async {
+  static Future<List<Map<String, dynamic>>> getCurrentDeliveries() async {
     final livreur = await getLivreurProfile();
-    if (livreur == null) return null;
+    if (livreur == null) return [];
     
     final response = await client.from('orders')
-        .select('*, restaurant:restaurants(*)')
+        .select('*, restaurant:restaurants(*), customer:profiles!customer_id(*)')
         .eq('livreur_id', livreur['id'])
-        .inFilter('status', ['confirmed', 'preparing', 'ready', 'picked_up'])
-        .order('created_at', ascending: false)
-        .limit(1)
-        .maybeSingle();
+        .inFilter('status', ['confirmed', 'preparing', 'ready', 'picked_up', 'delivering'])
+        .order('created_at', ascending: false);
     
-    return response;
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // Garder l'ancienne fonction pour compatibilité
+  static Future<Map<String, dynamic>?> getCurrentDelivery() async {
+    final deliveries = await getCurrentDeliveries();
+    return deliveries.isEmpty ? null : deliveries.first;
   }
 
   static Future<void> updateLivreurLocationForOrder(String orderId, double lat, double lng) async {
