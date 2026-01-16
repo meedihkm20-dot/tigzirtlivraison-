@@ -113,20 +113,21 @@ export class OrdersService {
     const orderNumber = `DZ${Date.now().toString(36).toUpperCase()}`;
 
     // 5. Créer la commande
+    // ⚠️ NOMS DE COLONNES = SCHÉMA SQL (source de vérité)
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
-        user_id: userId,
+        customer_id: userId,
         restaurant_id: dto.restaurant_id,
         order_number: orderNumber,
         status: 'pending',
         subtotal,
         delivery_fee: deliveryFee,
-        total_amount: totalAmount,
+        total: totalAmount, // ⚠️ SQL: "total" (pas "total_amount")
         delivery_address: dto.delivery_address,
-        delivery_lat: dto.delivery_lat,
-        delivery_lng: dto.delivery_lng,
-        notes: dto.notes,
+        delivery_latitude: dto.delivery_lat, // ⚠️ SQL: "delivery_latitude"
+        delivery_longitude: dto.delivery_lng, // ⚠️ SQL: "delivery_longitude"
+        delivery_instructions: dto.notes,
       })
       .select()
       .single();
@@ -208,10 +209,19 @@ export class OrdersService {
   /**
    * Livreur confirme livraison
    */
-  async markDelivered(orderId: string, driverId: string) {
+  async markDelivered(orderId: string, livreurUserId: string) {
     const order = await this.supabaseService.getOrderById(orderId);
+    const supabase = this.supabaseService.getClient();
 
-    if (order.driver_id !== driverId) {
+    // Récupérer le livreur depuis user_id
+    const { data: livreur } = await supabase
+      .from('livreurs')
+      .select('id')
+      .eq('user_id', livreurUserId)
+      .single();
+
+    // ⚠️ SQL: "livreur_id" (pas "driver_id")
+    if (order.livreur_id !== livreur?.id) {
       throw new BadRequestException('Non autorisé');
     }
 
@@ -320,7 +330,7 @@ export class OrdersService {
         }
         break;
       case 'preparing':
-        updates.preparing_at = now;
+        // Note: SQL n'a pas de colonne "preparing_at", on utilise "prepared_at" pour "ready"
         break;
       case 'ready':
         updates.prepared_at = now;

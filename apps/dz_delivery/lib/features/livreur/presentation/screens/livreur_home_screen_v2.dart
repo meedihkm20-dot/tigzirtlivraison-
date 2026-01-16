@@ -941,8 +941,9 @@ class _LivreurHomeScreenV2State extends State<LivreurHomeScreenV2>
     
     try {
       // ✅ Migration: Utilise le backend au lieu de Supabase direct
+      // ⚠️ Le status SQL correct est 'confirmed' (pas 'accepted')
       final backendApi = BackendApiService(SupabaseService.client);
-      await backendApi.changeOrderStatus(order['id'], 'accepted');
+      await backendApi.changeOrderStatus(order['id'], 'confirmed');
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

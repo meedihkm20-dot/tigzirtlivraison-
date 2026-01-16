@@ -61,12 +61,14 @@ export class DeliveryService {
     // Prendre le premier disponible (TODO: proximité)
     const driver = drivers[0];
 
-    // Assigner
+    // Assigner - ⚠️ SQL: "livreur_id" (pas "driver_id")
+    // ⚠️ SQL: pas de status "driver_assigned", on utilise "confirmed"
     await supabase
       .from('orders')
       .update({
-        driver_id: driver.id,
-        status: 'driver_assigned',
+        livreur_id: driver.id,
+        status: 'confirmed',
+        livreur_accepted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', orderId);

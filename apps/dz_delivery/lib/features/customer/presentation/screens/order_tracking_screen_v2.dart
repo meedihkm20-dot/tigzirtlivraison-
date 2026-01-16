@@ -86,27 +86,28 @@ class _OrderTrackingScreenV2State extends State<OrderTrackingScreenV2>
           _currentStatus = order['status'] ?? 'pending';
           _estimatedMinutes = order['estimated_delivery_minutes'] ?? 30;
           
-          // Parse positions
-          if (order['restaurant_lat'] != null && order['restaurant_lng'] != null) {
+          // Parse positions - ⚠️ Utilise les noms SQL corrects
+          final restaurant = order['restaurant'];
+          if (restaurant != null && restaurant['latitude'] != null && restaurant['longitude'] != null) {
             _restaurantPosition = LatLng(
-              (order['restaurant_lat'] as num).toDouble(),
-              (order['restaurant_lng'] as num).toDouble(),
+              (restaurant['latitude'] as num).toDouble(),
+              (restaurant['longitude'] as num).toDouble(),
             );
           }
-          if (order['delivery_lat'] != null && order['delivery_lng'] != null) {
+          if (order['delivery_latitude'] != null && order['delivery_longitude'] != null) {
             _deliveryPosition = LatLng(
-              (order['delivery_lat'] as num).toDouble(),
-              (order['delivery_lng'] as num).toDouble(),
+              (order['delivery_latitude'] as num).toDouble(),
+              (order['delivery_longitude'] as num).toDouble(),
             );
           }
           
           // Livreur info
           if (order['livreur'] != null) {
             _livreur = order['livreur'];
-            if (_livreur!['current_lat'] != null && _livreur!['current_lng'] != null) {
+            if (_livreur!['current_latitude'] != null && _livreur!['current_longitude'] != null) {
               _livreurPosition = LatLng(
-                (_livreur!['current_lat'] as num).toDouble(),
-                (_livreur!['current_lng'] as num).toDouble(),
+                (_livreur!['current_latitude'] as num).toDouble(),
+                (_livreur!['current_longitude'] as num).toDouble(),
               );
             }
           }

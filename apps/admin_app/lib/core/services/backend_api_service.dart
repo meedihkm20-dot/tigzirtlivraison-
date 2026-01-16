@@ -86,10 +86,11 @@ class BackendApiService {
   }
 
   /// Notifier livreur assigné
-  Future<void> notifyDriverAssigned(String orderId, String driverId) async {
+  /// ⚠️ Le backend attend 'livreur_id' (pas 'driver_id')
+  Future<void> notifyDriverAssigned(String orderId, String livreurId) async {
     await post('/api/notifications/driver-assigned', {
       'order_id': orderId,
-      'driver_id': driverId,
+      'livreur_id': livreurId,
     });
   }
 

@@ -74,16 +74,18 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
           _order = order;
           _currentStep = order['status'] == 'picked_up' ? 'delivery' : 'pickup';
           
-          if (order['restaurant_lat'] != null) {
+          // ⚠️ Utilise les noms SQL corrects
+          final restaurant = order['restaurant'];
+          if (restaurant != null && restaurant['latitude'] != null) {
             _restaurantPosition = LatLng(
-              (order['restaurant_lat'] as num).toDouble(),
-              (order['restaurant_lng'] as num).toDouble(),
+              (restaurant['latitude'] as num).toDouble(),
+              (restaurant['longitude'] as num).toDouble(),
             );
           }
-          if (order['delivery_lat'] != null) {
+          if (order['delivery_latitude'] != null) {
             _deliveryPosition = LatLng(
-              (order['delivery_lat'] as num).toDouble(),
-              (order['delivery_lng'] as num).toDouble(),
+              (order['delivery_latitude'] as num).toDouble(),
+              (order['delivery_longitude'] as num).toDouble(),
             );
           }
           _isLoading = false;
