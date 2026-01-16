@@ -58,9 +58,10 @@ class FavoritesState {
   }
 }
 
-/// Notifier pour gérer les favoris
-class FavoritesNotifier extends StateNotifier<FavoritesState> {
-  FavoritesNotifier() : super(const FavoritesState());
+/// Notifier pour gérer les favoris (Riverpod 3.x)
+class FavoritesNotifier extends Notifier<FavoritesState> {
+  @override
+  FavoritesState build() => const FavoritesState();
 
   /// Charger les favoris depuis Supabase
   Future<void> loadFavorites() async {
@@ -130,10 +131,8 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
   }
 }
 
-/// Provider global des favoris
-final favoritesProvider = StateNotifierProvider<FavoritesNotifier, FavoritesState>((ref) {
-  return FavoritesNotifier();
-});
+/// Provider global des favoris (Riverpod 3.x)
+final favoritesProvider = NotifierProvider<FavoritesNotifier, FavoritesState>(FavoritesNotifier.new);
 
 /// Provider pour vérifier si un restaurant est favori
 final isRestaurantFavoriteProvider = Provider.family<bool, String>((ref, restaurantId) {

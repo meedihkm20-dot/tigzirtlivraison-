@@ -59,9 +59,10 @@ class RestaurantState {
   }
 }
 
-/// Notifier pour gérer l'état restaurant
-class RestaurantNotifier extends StateNotifier<RestaurantState> {
-  RestaurantNotifier() : super(const RestaurantState());
+/// Notifier pour gérer l'état restaurant (Riverpod 3.x)
+class RestaurantNotifier extends Notifier<RestaurantState> {
+  @override
+  RestaurantState build() => const RestaurantState();
 
   /// Charger toutes les données restaurant
   Future<void> loadAll() async {
@@ -159,10 +160,8 @@ class RestaurantNotifier extends StateNotifier<RestaurantState> {
   }
 }
 
-/// Provider global de l'état restaurant
-final restaurantProvider = StateNotifierProvider<RestaurantNotifier, RestaurantState>((ref) {
-  return RestaurantNotifier();
-});
+/// Provider global de l'état restaurant (Riverpod 3.x)
+final restaurantProvider = NotifierProvider<RestaurantNotifier, RestaurantState>(RestaurantNotifier.new);
 
 /// Provider pour le statut ouvert/fermé
 final restaurantIsOpenProvider = Provider<bool>((ref) {

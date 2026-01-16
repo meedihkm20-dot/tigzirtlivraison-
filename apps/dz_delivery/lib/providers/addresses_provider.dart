@@ -105,9 +105,10 @@ class AddressesState {
   }
 }
 
-/// Notifier pour gérer les adresses
-class AddressesNotifier extends StateNotifier<AddressesState> {
-  AddressesNotifier() : super(const AddressesState());
+/// Notifier pour gérer les adresses (Riverpod 3.x)
+class AddressesNotifier extends Notifier<AddressesState> {
+  @override
+  AddressesState build() => const AddressesState();
 
   /// Charger les adresses depuis Supabase
   Future<void> loadAddresses() async {
@@ -183,10 +184,8 @@ class AddressesNotifier extends StateNotifier<AddressesState> {
   }
 }
 
-/// Provider global des adresses
-final addressesProvider = StateNotifierProvider<AddressesNotifier, AddressesState>((ref) {
-  return AddressesNotifier();
-});
+/// Provider global des adresses (Riverpod 3.x)
+final addressesProvider = NotifierProvider<AddressesNotifier, AddressesState>(AddressesNotifier.new);
 
 /// Provider pour l'adresse sélectionnée
 final selectedAddressProvider = Provider<SavedAddress?>((ref) {

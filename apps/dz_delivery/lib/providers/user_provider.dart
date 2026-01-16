@@ -47,9 +47,10 @@ class UserState {
   }
 }
 
-/// Notifier pour gérer le profil utilisateur
-class UserNotifier extends StateNotifier<UserState> {
-  UserNotifier() : super(const UserState());
+/// Notifier pour gérer le profil utilisateur (Riverpod 3.x)
+class UserNotifier extends Notifier<UserState> {
+  @override
+  UserState build() => const UserState();
 
   /// Charger le profil depuis Supabase
   Future<void> loadProfile() async {
@@ -92,10 +93,8 @@ class UserNotifier extends StateNotifier<UserState> {
   }
 }
 
-/// Provider global du profil utilisateur
-final userProvider = StateNotifierProvider<UserNotifier, UserState>((ref) {
-  return UserNotifier();
-});
+/// Provider global du profil utilisateur (Riverpod 3.x)
+final userProvider = NotifierProvider<UserNotifier, UserState>(UserNotifier.new);
 
 /// Provider pour vérifier si l'utilisateur est connecté
 final isLoggedInProvider = Provider<bool>((ref) {

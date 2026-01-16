@@ -119,9 +119,10 @@ class CartState {
   }
 }
 
-/// Notifier pour gérer le panier
-class CartNotifier extends StateNotifier<CartState> {
-  CartNotifier() : super(const CartState());
+/// Notifier pour gérer le panier (Riverpod 3.x)
+class CartNotifier extends Notifier<CartState> {
+  @override
+  CartState build() => const CartState();
 
   /// Ajouter un article au panier
   void addItem(CartItem item) {
@@ -244,10 +245,8 @@ class CartNotifier extends StateNotifier<CartState> {
   }
 }
 
-/// Provider global du panier
-final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
-  return CartNotifier();
-});
+/// Provider global du panier (Riverpod 3.x)
+final cartProvider = NotifierProvider<CartNotifier, CartState>(CartNotifier.new);
 
 /// Provider pour le nombre total d'articles
 final cartItemCountProvider = Provider<int>((ref) {

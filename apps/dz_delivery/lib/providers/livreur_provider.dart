@@ -75,9 +75,10 @@ class LivreurState {
   }
 }
 
-/// Notifier pour gérer l'état livreur
-class LivreurNotifier extends StateNotifier<LivreurState> {
-  LivreurNotifier() : super(const LivreurState());
+/// Notifier pour gérer l'état livreur (Riverpod 3.x)
+class LivreurNotifier extends Notifier<LivreurState> {
+  @override
+  LivreurState build() => const LivreurState();
 
   /// Charger toutes les données livreur
   Future<void> loadAll() async {
@@ -177,10 +178,8 @@ class LivreurNotifier extends StateNotifier<LivreurState> {
   }
 }
 
-/// Provider global de l'état livreur
-final livreurProvider = StateNotifierProvider<LivreurNotifier, LivreurState>((ref) {
-  return LivreurNotifier();
-});
+/// Provider global de l'état livreur (Riverpod 3.x)
+final livreurProvider = NotifierProvider<LivreurNotifier, LivreurState>(LivreurNotifier.new);
 
 /// Provider pour le statut online
 final livreurIsOnlineProvider = Provider<bool>((ref) {
