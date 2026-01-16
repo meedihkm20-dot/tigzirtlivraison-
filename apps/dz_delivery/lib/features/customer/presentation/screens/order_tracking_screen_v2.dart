@@ -439,6 +439,10 @@ class _OrderTrackingScreenV2State extends State<OrderTrackingScreenV2>
               // ETA Card
               _buildETACard(),
               
+              // Confirmation Code (when livreur is on the way)
+              if (_currentStatus == 'picked_up' || _currentStatus == 'delivering')
+                _buildConfirmationCodeCard(),
+              
               // Timeline
               _buildTimeline(),
               
@@ -517,6 +521,77 @@ class _OrderTrackingScreenV2State extends State<OrderTrackingScreenV2>
                 child: const Icon(Icons.phone, color: AppColors.clientPrimary),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConfirmationCodeCard() {
+    final confirmationCode = _order?['confirmation_code'] as String?;
+    
+    if (confirmationCode == null || confirmationCode.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.warningLight,
+        borderRadius: AppSpacing.borderRadiusMd,
+        border: Border.all(color: AppColors.warning, width: 2),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.warning,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.lock, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Code de confirmation',
+                      style: AppTypography.labelMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Donnez ce code au livreur',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: AppShadows.sm,
+            ),
+            child: Text(
+              confirmationCode,
+              style: AppTypography.displaySmall.copyWith(
+                fontWeight: FontWeight.bold,
+                letterSpacing: 8,
+                color: AppColors.warning,
+              ),
+            ),
+          ),
         ],
       ),
     );
