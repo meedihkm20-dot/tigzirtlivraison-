@@ -3,6 +3,13 @@ allprojects {
         google()
         mavenCentral()
     }
+    
+    // Suppress Java deprecation warnings for all projects
+    gradle.projectsEvaluated {
+        tasks.withType(JavaCompile).configureEach {
+            options.compilerArgs << '-Xlint:-deprecation' << '-Xlint:-options' << '-Xlint:-unchecked'
+        }
+    }
 }
 
 rootProject.buildDir = "../build"
@@ -11,22 +18,6 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
-    
-    // Force Java 17 for all subprojects (including plugins)
-    afterEvaluate { project ->
-        if (project.hasProperty('android')) {
-            project.android {
-                compileOptions {
-                    sourceCompatibility JavaVersion.VERSION_17
-                    targetCompatibility JavaVersion.VERSION_17
-                }
-            }
-        }
-        // Suppress deprecation warnings
-        tasks.withType(JavaCompile).configureEach {
-            options.compilerArgs << '-Xlint:-deprecation' << '-Xlint:-unchecked' << '-Xlint:-options'
-        }
-    }
 }
 
 tasks.register("clean", Delete) {
