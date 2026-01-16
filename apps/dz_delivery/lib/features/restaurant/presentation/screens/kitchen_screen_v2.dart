@@ -200,7 +200,7 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
                   child: Column(
                     children: [
                       // Filtres
-                      _buildFilters(newCount, preparingCount),
+                      _buildFilters(newCount, preparingCount, orders.length),
                       
                       // Grille des commandes
                       Expanded(
@@ -298,12 +298,12 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
     );
   }
 
-  Widget _buildFilters(int newCount, int preparingCount) {
+  Widget _buildFilters(int newCount, int preparingCount, int totalCount) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          _buildFilterChip('all', 'Toutes', _orders.length),
+          _buildFilterChip('all', 'Toutes', totalCount),
           const SizedBox(width: 8),
           _buildFilterChip('new', 'Nouvelles', newCount, AppColors.warning),
           const SizedBox(width: 8),

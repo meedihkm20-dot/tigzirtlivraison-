@@ -11,6 +11,7 @@ import '../../../../core/design_system/components/cards/order_card.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/backend_api_service.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/models/database_models.dart';
 import '../../../../providers/providers.dart';
 
 class RestaurantDashboardScreen extends ConsumerStatefulWidget {
