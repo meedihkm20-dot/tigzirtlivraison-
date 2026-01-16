@@ -724,6 +724,7 @@ class _RestaurantDetailScreenV2State extends ConsumerState<RestaurantDetailScree
         content: Text('${item['name']} ajouté au panier ($cartCount)'),
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
         action: SnackBarAction(
           label: 'Voir',
           textColor: Colors.white,
