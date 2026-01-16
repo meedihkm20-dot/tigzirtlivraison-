@@ -475,7 +475,7 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
               const SizedBox(width: 12),
               Expanded(child: _buildActionButton(Icons.emoji_events, 'Niveau', AppRouter.tierProgress)),
               const SizedBox(width: 12),
-              Expanded(child: _buildActionButton(Icons.history, 'Historique', AppRouter.customerOrders)),
+              Expanded(child: _buildActionButton(Icons.history, 'Historique', AppRouter.livreurHistory)),
               const SizedBox(width: 12),
               Expanded(child: _buildActionButton(Icons.map, 'Zones', null)),
             ],

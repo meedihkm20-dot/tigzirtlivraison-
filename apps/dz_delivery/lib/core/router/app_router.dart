@@ -38,6 +38,7 @@ import '../../features/livreur/presentation/badges_screen.dart';
 // Livreur V2
 import '../../features/livreur/presentation/screens/livreur_home_screen_v2.dart';
 import '../../features/livreur/presentation/screens/delivery_screen_v2.dart';
+import '../../features/livreur/presentation/screens/livreur_history_screen_v2.dart';
 import '../../features/livreur/presentation/screens/earnings_screen_v2.dart';
 import '../../features/livreur/presentation/screens/tier_progress_screen_v2.dart';
 
@@ -77,6 +78,7 @@ class AppRouter {
   static const String livreurProfile = '/livreur/profile';
   static const String badges = '/livreur/badges';
   static const String tierProgress = '/livreur/tier-progress';
+  static const String livreurHistory = '/livreur/history';
   
   // Customer extras
   static const String notifications = '/customer/notifications';
@@ -155,6 +157,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const BadgesScreen());
       case tierProgress:
         return MaterialPageRoute(builder: (_) => const TierProgressScreenV2());
+      case livreurHistory:
+        return MaterialPageRoute(builder: (_) => const LivreurHistoryScreenV2());
       
       // Customer extras
       case notifications:
