@@ -25,44 +25,43 @@ class _CartScreenState extends State<CartScreen> {
     _loadCart();
   }
 
-  void _loadCart() {
-    final cartBox = Hive.box('cart');
-    setState(() {
-      _items = List<Map<String, dynamic>>.from(cartBox.get('items', defaultValue: []));
-      _restaurantId = cartBox.get('restaurant_id');
-      if (_items.isNotEmpty) _restaurantName = _items.first['restaurant_name'];
-    });
-  }
-
-  void _updateQuantity(int index, int delta) {
-    setState(() {
-      _items[index]['quantity'] = (_items[index]['quantity'] ?? 1) + delta;
-      if (_items[index]['quantity'] <= 0) {
-        _items.removeAt(index);
-      }
-    });
-    _saveCart();
-  }
-
-  void _saveCart() {
-    final cartBox = Hive.box('cart');
-    cartBox.put('items', _items);
-    if (_items.isEmpty) {
-      cartBox.delete('restaurant_id');
+  Future<void> _loadCart() async {
+    setState(() => _isLoading = true);
+    try {
+      final cartItems = await SupabaseService.getCartItems();
+      setState(() {
+        _items = cartItems;
+        if (_items.isNotEmpty) {
+          _restaurantId = _items.first['restaurant_id'];
+          _restaurantName = _items.first['restaurant_name'];
+        }
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      debugPrint('Erreur chargement panier: $e');
     }
   }
 
-  void _clearCart() {
-    final cartBox = Hive.box('cart');
-    cartBox.delete('items');
-    cartBox.delete('restaurant_id');
-    setState(() {
-      _items = [];
-      _restaurantId = null;
-    });
+  Future<void> _updateQuantity(int index, int delta) async {
+    final cartItemId = _items[index]['id'] as String;
+    final newQuantity = (_items[index]['quantity'] as int) + delta;
+    
+    if (newQuantity <= 0) {
+      await SupabaseService.removeFromCart(cartItemId);
+    } else {
+      await SupabaseService.updateCartItemQuantity(cartItemId, newQuantity);
+    }
+    
+    await _loadCart();
   }
 
-  double get _subtotal => _items.fold(0.0, (sum, item) => sum + ((item['price'] as num?)?.toDouble() ?? 0) * ((item['quantity'] as num?)?.toInt() ?? 1));
+  Future<void> _clearCart() async {
+    await SupabaseService.clearCart();
+    await _loadCart();
+  }
+
+  double get _subtotal => _items.fold(0.0, (sum, item) => sum + ((item['item_price'] as num?)?.toDouble() ?? 0) * ((item['quantity'] as num?)?.toInt() ?? 1));
   double get _deliveryFee => 150;
   double get _total => _subtotal + _deliveryFee;
 

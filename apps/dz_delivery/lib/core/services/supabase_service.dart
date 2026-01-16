@@ -1460,6 +1460,12 @@ class SupabaseService {
     await client.from('cart_items').delete().eq('customer_id', currentUser!.id);
   }
 
+  static Future<List<Map<String, dynamic>>> getCartItems() async {
+    if (currentUser == null) return [];
+    final response = await client.rpc('get_cart_items', params: {'p_customer_id': currentUser!.id});
+    return List<Map<String, dynamic>>.from(response ?? []);
+  }
+
   static Future<List<Map<String, dynamic>>> getMenuSuggestions(String restaurantId, {int limit = 4}) async {
     final response = await client.from('menu_items')
         .select()
