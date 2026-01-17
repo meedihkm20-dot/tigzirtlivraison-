@@ -36,7 +36,6 @@ import '../../features/restaurant/presentation/restaurant_order_detail_screen.da
 import '../../features/restaurant/presentation/restaurant_profile_screen.dart';
 import '../../features/restaurant/presentation/promotions_screen.dart';
 // Livreur
-import '../../features/livreur/presentation/livreur_profile_screen.dart';
 import '../../features/livreur/presentation/badges_screen.dart';
 // Livreur V2
 import '../../features/livreur/presentation/screens/livreur_home_screen_v2.dart';
@@ -176,7 +175,7 @@ class AppRouter {
       case earnings:
         return MaterialPageRoute(builder: (_) => const EarningsScreenV2());
       case livreurProfile:
-        return MaterialPageRoute(builder: (_) => const LivreurProfileScreen());
+        return MaterialPageRoute(builder: (_) => const LivreurProfileScreenV2());
       case badges:
         return MaterialPageRoute(builder: (_) => const BadgesScreen());
       case tierProgress:
