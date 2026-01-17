@@ -20,6 +20,11 @@ out/
 .env.production.local
 *.env
 
+# Firebase sensitive files
+**/google-services.json
+google-services*.json
+**/GoogleService-Info.plist
+
 # IDE
 .idea/
 .vscode/
