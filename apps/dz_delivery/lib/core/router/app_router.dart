@@ -22,6 +22,7 @@ import '../../features/customer/presentation/screens/order_tracking_screen_v2.da
 import '../../features/customer/presentation/screens/customer_profile_screen_v2.dart';
 import '../../features/customer/presentation/screens/search_screen_v2.dart';
 import '../../features/customer/presentation/screens/support_screen_v2.dart';
+import '../../features/customer/presentation/screens/filter_management_screen.dart';
 // Restaurant
 import '../../features/restaurant/presentation/screens/restaurant_dashboard_screen.dart';
 import '../../features/restaurant/presentation/screens/kitchen_screen_v2.dart';
@@ -91,6 +92,7 @@ class AppRouter {
   static const String liveTracking = '/customer/live-tracking';
   static const String reorder = '/customer/reorder';
   static const String referral = '/customer/referral';
+  static const String filterManagement = '/customer/filter-management';
   static const String chat = '/chat';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -129,6 +131,8 @@ class AppRouter {
         ));
       case support:
         return MaterialPageRoute(builder: (_) => const SupportScreenV2());
+      case filterManagement:
+        return MaterialPageRoute(builder: (_) => const FilterManagementScreen());
       
       // Restaurant
       case restaurantHome:

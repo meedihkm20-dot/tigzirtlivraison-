@@ -8,8 +8,10 @@ import '../../../../core/design_system/theme/app_spacing.dart';
 import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/design_system/components/loaders/skeleton_loader.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/services/filter_preferences_service.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../providers/providers.dart';
+import 'filter_management_screen.dart';
 
 /// Écran de recherche V2 - Recherche restaurants et plats avec filtres
 class SearchScreenV2 extends ConsumerStatefulWidget {
@@ -46,20 +48,12 @@ class _SearchScreenV2State extends ConsumerState<SearchScreenV2> {
   bool _freeDeliveryOnly = false;
   String _sortBy = 'rating'; // rating, distance, delivery_time, price
   
-  final List<Map<String, dynamic>> _categories = [
-    {'name': 'Pizza', 'icon': '🍕'},
-    {'name': 'Burger', 'icon': '🍔'},
-    {'name': 'Asiatique', 'icon': '🍜'},
-    {'name': 'Salades', 'icon': '🥗'},
-    {'name': 'Desserts', 'icon': '🍰'},
-    {'name': 'Café', 'icon': '☕'},
-    {'name': 'Tacos', 'icon': '🌮'},
-    {'name': 'Sushi', 'icon': '🍣'},
-  ];
+  List<Map<String, dynamic>> _categories = [];
 
   @override
   void initState() {
     super.initState();
+    _loadCategories();
     if (widget.initialQuery != null) {
       _searchController.text = widget.initialQuery!;
       _searchQuery = widget.initialQuery!;
@@ -69,6 +63,12 @@ class _SearchScreenV2State extends ConsumerState<SearchScreenV2> {
       _selectedCategory = widget.categoryFilter;
     }
     _loadRecentSearches();
+  }
+
+  void _loadCategories() {
+    setState(() {
+      _categories = FilterPreferencesService.getVisibleCategories();
+    });
   }
 
   @override
@@ -282,6 +282,18 @@ class _SearchScreenV2State extends ConsumerState<SearchScreenV2> {
       ),
       actions: [
         IconButton(
+          icon: const Icon(Icons.settings, color: AppColors.textTertiary),
+          onPressed: () async {
+            HapticFeedback.lightImpact();
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const FilterManagementScreen()),
+            );
+            _loadCategories(); // Recharger les catégories après modification
+          },
+          tooltip: 'Gérer les filtres',
+        ),
+        IconButton(
           icon: Icon(
             _showFilters ? Icons.filter_list : Icons.tune,
             color: _showFilters ? AppColors.clientPrimary : AppColors.textTertiary,
@@ -290,6 +302,7 @@ class _SearchScreenV2State extends ConsumerState<SearchScreenV2> {
             HapticFeedback.lightImpact();
             setState(() => _showFilters = !_showFilters);
           },
+          tooltip: 'Filtres de recherche',
         ),
       ],
     );
@@ -319,7 +332,7 @@ class _SearchScreenV2State extends ConsumerState<SearchScreenV2> {
                 }
                 final category = _categories[index - 1];
                 return _buildCategoryChip(
-                  category['name'],
+                  category['id'],
                   category['name'],
                   category['icon'],
                 );
