@@ -38,8 +38,8 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2> {
     setState(() => _isLoading = true);
     try {
       final results = await Future.wait([
-        SupabaseService.getUserProfile(),
-        SupabaseService.getUserStats(),
+        SupabaseService.getProfile(),
+        SupabaseService.getCustomerStats(),
         SupabaseService.getRecentOrders(limit: 3),
       ]);
       
