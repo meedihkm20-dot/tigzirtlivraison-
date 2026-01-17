@@ -425,12 +425,24 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> getRestaurantPendingOrders() async {
     final restaurant = await getMyRestaurant();
     if (restaurant == null) return [];
-    final response = await client.from('orders')
-        .select('*, customer:profiles!customer_id(full_name, phone), order_items(*)')
-        .eq('restaurant_id', restaurant['id'])
-        .inFilter('status', ['pending', 'confirmed', 'preparing'])
-        .order('created_at', ascending: true);
-    return List<Map<String, dynamic>>.from(response);
+    
+    try {
+      final response = await client.from('orders')
+          .select('''
+            *,
+            customer:profiles!orders_customer_id_fkey(full_name, phone),
+            livreur:livreurs!orders_livreur_id_fkey(user:profiles(full_name, phone)),
+            order_items(*)
+          ''')
+          .eq('restaurant_id', restaurant['id'])
+          .inFilter('status', ['pending', 'confirmed', 'preparing'])
+          .order('created_at', ascending: true);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Erreur getRestaurantPendingOrders: $e');
+      return [];
+    }
   }
 
   static Future<void> confirmOrder(String orderId, int prepTimeMinutes) async {
@@ -541,7 +553,7 @@ class SupabaseService {
   /// Livreurs voient les nouvelles commandes (status = pending, pas encore de livreur)
   static Future<List<Map<String, dynamic>>> getAvailableOrders() async {
     final response = await client.from('orders')
-        .select('*, restaurant:restaurants(*), customer:profiles!customer_id(full_name, phone)')
+        .select('*, restaurant:restaurants(*), customer:profiles!orders_customer_id_fkey(full_name, phone)')
         .eq('status', 'pending')
         .isFilter('livreur_id', null)
         .order('created_at', ascending: false);
@@ -554,7 +566,7 @@ class SupabaseService {
     if (livreur == null) return [];
     
     final response = await client.from('orders')
-        .select('*, restaurant:restaurants(*), customer:profiles!customer_id(full_name, phone, address), confirmation_code, livreur_commission')
+        .select('*, restaurant:restaurants(*), customer:profiles!orders_customer_id_fkey(full_name, phone, address), confirmation_code, livreur_commission')
         .eq('livreur_id', livreur['id'])
         .inFilter('status', ['confirmed', 'preparing', 'ready', 'picked_up', 'delivering'])
         .order('created_at', ascending: false);
@@ -861,7 +873,7 @@ class SupabaseService {
 
   static Future<List<Map<String, dynamic>>> getRestaurantReviews(String restaurantId) async {
     final response = await client.from('reviews')
-        .select('*, customer:profiles!customer_id(full_name, avatar_url)')
+        .select('*, customer:profiles!reviews_customer_id_fkey(full_name, avatar_url)')
         .eq('restaurant_id', restaurantId)
         .order('created_at', ascending: false)
         .limit(50);
@@ -1431,7 +1443,7 @@ class SupabaseService {
 
   static Future<Map<String, dynamic>?> getOrderDetails(String orderId) async {
     return await client.from('orders')
-        .select('*, restaurant:restaurants(*), livreur:livreurs(*, profile:profiles(*)), order_items(*), customer:profiles!customer_id(*)')
+        .select('*, restaurant:restaurants(*), livreur:livreurs(*, profile:profiles(*)), order_items(*), customer:profiles!orders_customer_id_fkey(*)')
         .eq('id', orderId)
         .maybeSingle();
   }
@@ -1545,7 +1557,7 @@ class SupabaseService {
     if (livreur == null) return [];
     
     final response = await client.from('orders')
-        .select('*, restaurant:restaurants(*), customer:profiles!customer_id(*)')
+        .select('*, restaurant:restaurants(*), customer:profiles!orders_customer_id_fkey(*)')
         .eq('livreur_id', livreur['id'])
         .inFilter('status', ['confirmed', 'preparing', 'ready', 'picked_up', 'delivering'])
         .order('created_at', ascending: false);
