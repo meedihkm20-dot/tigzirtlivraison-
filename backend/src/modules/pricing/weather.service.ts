@@ -31,7 +31,8 @@ export class WeatherService {
   }
 
   private async getCachedWeather(lat: number, lng: number): Promise<any> {
-    const { data } = await this.supabase.client
+    const client = this.supabase.getClient();
+    const { data } = await client
       .from('weather_data')
       .select('*')
       .gte('expires_at', new Date().toISOString())
@@ -54,7 +55,7 @@ export class WeatherService {
     return null;
   }
 
-  private async fetchWeatherFromAPI(lat: number, lng: number): Promise<any> {
+  private async fetchWeatherFromAPI(_lat: number, _lng: number): Promise<any> {
     // Simulation d'API météo - À remplacer par vraie API
     // Exemple avec OpenWeatherMap:
     // const apiKey = process.env.OPENWEATHER_API_KEY;
@@ -98,7 +99,8 @@ export class WeatherService {
 
   private async cacheWeatherData(lat: number, lng: number, weatherData: any): Promise<void> {
     try {
-      await this.supabase.client
+      const client = this.supabase.getClient();
+      await client
         .from('weather_data')
         .insert({
           location_name: `${lat.toFixed(4)},${lng.toFixed(4)}`,
@@ -135,7 +137,8 @@ export class WeatherService {
 
   // Méthodes pour l'administration
   async getWeatherHistory(startDate: Date, endDate: Date): Promise<any[]> {
-    const { data } = await this.supabase.client
+    const client = this.supabase.getClient();
+    const { data } = await client
       .from('weather_data')
       .select('*')
       .gte('recorded_at', startDate.toISOString())
@@ -146,13 +149,14 @@ export class WeatherService {
   }
 
   async getWeatherStats(): Promise<any> {
-    const { data } = await this.supabase.client
+    const client = this.supabase.getClient();
+    const { data } = await client
       .from('weather_data')
       .select('condition')
       .gte('recorded_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // 24h
 
-    const stats = {};
-    data?.forEach(item => {
+    const stats: Record<string, number> = {};
+    data?.forEach((item: any) => {
       stats[item.condition] = (stats[item.condition] || 0) + 1;
     });
 

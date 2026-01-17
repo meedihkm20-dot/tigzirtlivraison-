@@ -44,7 +44,7 @@ export class PricingController {
 
   @Get('config')
   async getPricingConfig() {
-    return await this.pricingService.getPricingConfig();
+    return await this.pricingService.getPricingConfigAdmin();
   }
 
   @Get('zones')

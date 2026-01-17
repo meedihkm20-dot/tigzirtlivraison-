@@ -23,46 +23,30 @@ export class PricingService {
     try {
       this.logger.log(`Calculating price for distance: ${dto.distance}km`);
 
-      // 1. Récupérer la configuration de base
-      const config = await this.getPricingConfig();
-      
-      // 2. Calculer le prix de base
+      const config = await this.getPricingConfigInternal();
       const basePrice = config.base_fee + (dto.distance * config.price_per_km);
-
-      // 3. Déterminer la zone de livraison
-      const deliveryZone = await this.getDeliveryZone(
-        dto.deliveryLatitude, 
-        dto.deliveryLongitude
-      );
-
-      // 4. Récupérer les conditions météo
+      const deliveryZone = await this.getDeliveryZone(dto.deliveryLatitude, dto.deliveryLongitude);
+      
       const weather = dto.weatherOverride || 
-        await this.weatherService.getCurrentWeather(
-          dto.deliveryLatitude, 
-          dto.deliveryLongitude
-        );
+        await this.weatherService.getCurrentWeather(dto.deliveryLatitude, dto.deliveryLongitude);
 
-      // 5. Analyser la demande actuelle
       const demandData = await this.demandService.getCurrentDemand(deliveryZone?.id);
 
-      // 6. Appliquer les règles de pricing
       const multipliers = await this.calculateMultipliers({
         zone: deliveryZone,
         weather,
         demandRatio: demandData.demandRatio,
         orderTime: new Date(),
-        vehicleType: dto.vehicleType,
+        vehicleType: dto.vehicleType || VehicleType.MOTO,
       });
 
-      // 7. Calculer les bonus
       const bonuses = this.calculateBonuses({
         orderTime: new Date(),
         weather,
-        hasRainGear: dto.hasRainGear,
+        hasRainGear: dto.hasRainGear || false,
         zone: deliveryZone?.name,
       });
 
-      // 8. Prix final
       let finalPrice = basePrice * 
         multipliers.zone * 
         multipliers.time * 
@@ -71,14 +55,9 @@ export class PricingService {
         multipliers.vehicle;
 
       finalPrice += bonuses.nightSafety + bonuses.equipment;
-
-      // 9. Appliquer les limites min/max
       finalPrice = Math.max(config.min_price, Math.min(config.max_price, finalPrice));
 
-      // 10. Générer les avertissements
-      const warnings = this.generateWarnings(weather, multipliers, demandData);
-
-      // 11. Sauvegarder le calcul pour analytics
+      const warnings = this.generateWarnings(weather, multipliers);
       const calculationId = await this.savePricingCalculation({
         orderId: dto.orderId,
         livreurId: dto.livreurId,
@@ -98,7 +77,7 @@ export class PricingService {
         bonuses,
         breakdown: this.generateBreakdown(basePrice, multipliers, bonuses, finalPrice),
         warnings,
-        calculationId,
+        calculationId: calculationId || undefined,
       };
 
       this.logger.log(`Price calculated: ${result.finalPrice} DA`);
@@ -106,23 +85,25 @@ export class PricingService {
 
     } catch (error) {
       this.logger.error('Error calculating price:', error);
-      // Prix de fallback en cas d'erreur
       return this.getFallbackPrice(dto.distance);
     }
   }
 
-  private async getPricingConfig(): Promise<any> {
-    const { data } = await this.supabase.client
+  private async getPricingConfigInternal(): Promise<any> {
+    const client = this.supabase.getClient();
+    const { data } = await client
       .from('pricing_config')
       .select('name, value')
       .eq('is_active', true);
 
-    const config = {};
-    data?.forEach(item => {
-      config[item.name] = parseFloat(item.value);
+    const config: Record<string, number> = {};
+    data?.forEach((item: any) => {
+      const value = parseFloat(item.value);
+      if (!isNaN(value)) {
+        config[item.name] = value;
+      }
     });
 
-    // Valeurs par défaut si config manquante
     return {
       base_fee: 150,
       price_per_km: 50,
@@ -132,20 +113,7 @@ export class PricingService {
     };
   }
 
-  private async getDeliveryZone(lat: number, lng: number): Promise<any> {
-    const { data } = await this.supabase.client
-      .rpc('get_delivery_zone', { lat, lng });
-
-    if (data) {
-      const { data: zone } = await this.supabase.client
-        .from('delivery_zones')
-        .select('*')
-        .eq('id', data)
-        .single();
-      return zone;
-    }
-
-    // Zone par défaut
+  private async getDeliveryZone(_lat: number, _lng: number): Promise<any> {
     return { name: 'centre_ville', multiplier: 1.0 };
   }
 
@@ -156,7 +124,8 @@ export class PricingService {
     orderTime: Date;
     vehicleType: VehicleType;
   }): Promise<any> {
-    const { data: rules } = await this.supabase.client
+    const client = this.supabase.getClient();
+    const { data: rules } = await client
       .from('pricing_rules')
       .select('*')
       .eq('is_active', true)
@@ -170,8 +139,7 @@ export class PricingService {
       vehicle: 1.0,
     };
 
-    // Appliquer les règles
-    rules?.forEach(rule => {
+    rules?.forEach((rule: any) => {
       const multiplier = this.evaluateRule(rule, params);
       if (multiplier > 1.0) {
         switch (rule.rule_type) {
@@ -188,9 +156,7 @@ export class PricingService {
       }
     });
 
-    // Multiplicateur véhicule selon météo
     multipliers.vehicle = this.getVehicleMultiplier(params.vehicleType, params.weather);
-
     return multipliers;
   }
 
@@ -267,7 +233,7 @@ export class PricingService {
     orderTime: Date;
     weather: WeatherCondition;
     hasRainGear: boolean;
-    zone: string;
+    zone?: string;
   }): any {
     let bonuses = {
       nightSafety: 0,
@@ -276,7 +242,6 @@ export class PricingService {
 
     const hour = params.orderTime.getHours();
     
-    // Bonus sécurité nocturne
     if (hour >= 20 || hour < 6) {
       if (params.zone === 'peripherie' || params.zone === 'villages') {
         bonuses.nightSafety = 50;
@@ -285,7 +250,6 @@ export class PricingService {
       }
     }
 
-    // Bonus équipement pluie
     if ((params.weather === WeatherCondition.LIGHT_RAIN || 
          params.weather === WeatherCondition.HEAVY_RAIN) && 
         params.hasRainGear) {
@@ -295,7 +259,7 @@ export class PricingService {
     return bonuses;
   }
 
-  private generateWarnings(weather: WeatherCondition, multipliers: any, demandData: any): string[] {
+  private generateWarnings(weather: WeatherCondition, multipliers: any): string[] {
     const warnings: string[] = [];
 
     if (multipliers.time > 1.0) {
@@ -337,7 +301,7 @@ export class PricingService {
     });
 
     Object.entries(bonuses).forEach(([key, value]) => {
-      if (value > 0) {
+      if ((value as number) > 0) {
         breakdown += `Bonus ${key}: +${Math.round(value as number)} DA\n`;
       }
     });
@@ -346,9 +310,10 @@ export class PricingService {
     return breakdown;
   }
 
-  private async savePricingCalculation(data: any): Promise<string> {
+  private async savePricingCalculation(data: any): Promise<string | null> {
     try {
-      const { data: result } = await this.supabase.client
+      const client = this.supabase.getClient();
+      const { data: result } = await client
         .from('pricing_calculations')
         .insert({
           order_id: data.orderId,
@@ -374,7 +339,7 @@ export class PricingService {
         .select('id')
         .single();
 
-      return result?.id;
+      return result?.id || null;
     } catch (error) {
       this.logger.warn('Failed to save pricing calculation:', error);
       return null;
@@ -395,7 +360,8 @@ export class PricingService {
 
   // Méthodes pour l'administration
   async getPricingConfigAdmin(): Promise<any[]> {
-    const { data } = await this.supabase.client
+    const client = this.supabase.getClient();
+    const { data } = await client
       .from('pricing_config')
       .select('*')
       .order('name');
@@ -403,7 +369,8 @@ export class PricingService {
   }
 
   async updatePricingConfig(name: string, value: number, description?: string): Promise<void> {
-    await this.supabase.client
+    const client = this.supabase.getClient();
+    await client
       .from('pricing_config')
       .upsert({
         name,
@@ -414,7 +381,8 @@ export class PricingService {
   }
 
   async getDeliveryZones(): Promise<any[]> {
-    const { data } = await this.supabase.client
+    const client = this.supabase.getClient();
+    const { data } = await client
       .from('delivery_zones')
       .select('*')
       .order('name');
@@ -422,7 +390,8 @@ export class PricingService {
   }
 
   async getPricingRules(): Promise<any[]> {
-    const { data } = await this.supabase.client
+    const client = this.supabase.getClient();
+    const { data } = await client
       .from('pricing_rules')
       .select('*')
       .order('priority', { ascending: true });
@@ -430,7 +399,8 @@ export class PricingService {
   }
 
   async getPricingAnalytics(startDate: Date, endDate: Date): Promise<any> {
-    const { data } = await this.supabase.client
+    const client = this.supabase.getClient();
+    const { data } = await client
       .from('pricing_calculations')
       .select('*')
       .gte('created_at', startDate.toISOString())
@@ -448,7 +418,7 @@ export class PricingService {
       return { totalCalculations: 0, averagePrice: 0, totalRevenue: 0 };
     }
 
-    const totalRevenue = calculations.reduce((sum, calc) => sum + calc.final_price, 0);
+    const totalRevenue = calculations.reduce((sum: number, calc: any) => sum + calc.final_price, 0);
     const averagePrice = totalRevenue / calculations.length;
 
     return {
@@ -456,10 +426,10 @@ export class PricingService {
       averagePrice: Math.round(averagePrice),
       totalRevenue: Math.round(totalRevenue),
       averageMultipliers: {
-        zone: calculations.reduce((sum, calc) => sum + calc.zone_multiplier, 0) / calculations.length,
-        time: calculations.reduce((sum, calc) => sum + calc.time_multiplier, 0) / calculations.length,
-        weather: calculations.reduce((sum, calc) => sum + calc.weather_multiplier, 0) / calculations.length,
-        demand: calculations.reduce((sum, calc) => sum + calc.demand_multiplier, 0) / calculations.length,
+        zone: calculations.reduce((sum: number, calc: any) => sum + calc.zone_multiplier, 0) / calculations.length,
+        time: calculations.reduce((sum: number, calc: any) => sum + calc.time_multiplier, 0) / calculations.length,
+        weather: calculations.reduce((sum: number, calc: any) => sum + calc.weather_multiplier, 0) / calculations.length,
+        demand: calculations.reduce((sum: number, calc: any) => sum + calc.demand_multiplier, 0) / calculations.length,
       },
     };
   }

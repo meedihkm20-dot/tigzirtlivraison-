@@ -9,6 +9,7 @@ import '../../features/finance/presentation/finance_screen.dart';
 import '../../features/incidents/presentation/incidents_screen.dart';
 import '../../features/audit/presentation/audit_logs_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/pricing/presentation/screens/pricing_management_screen.dart';
 
 class AppRouter {
   static const String splash = '/';
@@ -21,6 +22,7 @@ class AppRouter {
   static const String incidents = '/incidents';
   static const String auditLogs = '/audit-logs';
   static const String settings = '/settings';
+  static const String pricing = '/pricing';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -44,6 +46,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const AuditLogsScreen());
       case AppRouter.settings:
         return MaterialPageRoute(builder: (_) => const SettingsScreen());
+      case pricing:
+        return MaterialPageRoute(builder: (_) => const PricingManagementScreen());
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(

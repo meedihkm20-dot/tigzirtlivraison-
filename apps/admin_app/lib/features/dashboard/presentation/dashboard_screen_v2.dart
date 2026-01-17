@@ -316,6 +316,7 @@ class _DashboardScreenV2State extends State<DashboardScreenV2> {
                         _QuickAction(icon: Icons.search, label: 'Rechercher', onTap: () => Navigator.pushNamed(context, AppRouter.orders)),
                         _QuickAction(icon: Icons.report_problem, label: 'Incidents', onTap: () => Navigator.pushNamed(context, AppRouter.incidents)),
                         _QuickAction(icon: Icons.account_balance_wallet, label: 'Finance', onTap: () => Navigator.pushNamed(context, AppRouter.finance)),
+                        _QuickAction(icon: Icons.trending_up, label: 'Pricing', onTap: () => Navigator.pushNamed(context, AppRouter.pricing)),
                         _QuickAction(icon: Icons.settings, label: 'Paramètres', onTap: () => Navigator.pushNamed(context, AppRouter.settings)),
                       ],
                     ),

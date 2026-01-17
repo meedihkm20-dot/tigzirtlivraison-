@@ -42,49 +42,42 @@ export class DemandAnalyticsService {
   }
 
   private async countAvailableDrivers(zoneId?: string): Promise<number> {
-    let query = this.supabase.client
+    const client = this.supabase.getClient();
+    let query = client
       .from('livreurs')
       .select('id', { count: 'exact' })
       .eq('is_available', true)
       .eq('is_online', true);
-
-    // TODO: Filtrer par zone si nécessaire
-    // if (zoneId) {
-    //   query = query.eq('preferred_zone_id', zoneId);
-    // }
 
     const { count } = await query;
     return count || 0;
   }
 
   private async countPendingOrders(zoneId?: string): Promise<number> {
-    let query = this.supabase.client
+    const client = this.supabase.getClient();
+    let query = client
       .from('orders')
       .select('id', { count: 'exact' })
       .in('status', ['pending', 'confirmed']);
-
-    // TODO: Filtrer par zone de livraison si nécessaire
-    // if (zoneId) {
-    //   query = query.eq('delivery_zone_id', zoneId);
-    // }
 
     const { count } = await query;
     return count || 0;
   }
 
   private async saveDemandAnalytics(
-    zoneId: string, 
+    zoneId: string | undefined, 
     availableDrivers: number, 
     pendingOrders: number, 
     demandRatio: number
   ): Promise<void> {
     try {
       const now = new Date();
+      const client = this.supabase.getClient();
       
-      await this.supabase.client
+      await client
         .from('demand_analytics')
         .insert({
-          zone_id: zoneId,
+          zone_name: zoneId || 'default',
           pending_orders: pendingOrders,
           available_drivers: availableDrivers,
           demand_ratio: demandRatio,
@@ -99,7 +92,8 @@ export class DemandAnalyticsService {
 
   // Méthodes pour l'administration et analytics
   async getDemandHistory(startDate: Date, endDate: Date, zoneId?: string): Promise<any[]> {
-    let query = this.supabase.client
+    const client = this.supabase.getClient();
+    let query = client
       .from('demand_analytics')
       .select('*')
       .gte('recorded_at', startDate.toISOString())
@@ -107,7 +101,7 @@ export class DemandAnalyticsService {
       .order('recorded_at', { ascending: false });
 
     if (zoneId) {
-      query = query.eq('zone_id', zoneId);
+      query = query.eq('zone_name', zoneId);
     }
 
     const { data } = await query;
@@ -115,15 +109,16 @@ export class DemandAnalyticsService {
   }
 
   async getDemandTrends(): Promise<any> {
+    const client = this.supabase.getClient();
     // Tendances par heure de la journée
-    const { data: hourlyTrends } = await this.supabase.client
+    const { data: hourlyTrends } = await client
       .from('demand_analytics')
       .select('hour_of_day, demand_ratio')
       .gte('recorded_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // 7 jours
       .order('hour_of_day');
 
     // Tendances par jour de la semaine
-    const { data: weeklyTrends } = await this.supabase.client
+    const { data: weeklyTrends } = await client
       .from('demand_analytics')
       .select('day_of_week, demand_ratio')
       .gte('recorded_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // 30 jours
@@ -155,7 +150,8 @@ export class DemandAnalyticsService {
   }
 
   async getPeakHours(): Promise<any[]> {
-    const { data } = await this.supabase.client
+    const client = this.supabase.getClient();
+    const { data } = await client
       .from('demand_analytics')
       .select('hour_of_day, demand_ratio')
       .gte('recorded_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
@@ -166,30 +162,26 @@ export class DemandAnalyticsService {
   }
 
   async getZoneStats(): Promise<any[]> {
-    const { data } = await this.supabase.client
+    const client = this.supabase.getClient();
+    const { data } = await client
       .from('demand_analytics')
-      .select(`
-        zone_id,
-        delivery_zones(name),
-        demand_ratio
-      `)
+      .select('zone_name, demand_ratio')
       .gte('recorded_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // 24h
       .order('demand_ratio', { ascending: false });
 
     // Grouper par zone
-    const zoneStats = {};
-    data?.forEach(item => {
-      const zoneId = item.zone_id;
-      if (!zoneStats[zoneId]) {
-        zoneStats[zoneId] = {
-          zoneId,
-          zoneName: item.delivery_zones?.name || 'Zone inconnue',
+    const zoneStats: Record<string, any> = {};
+    data?.forEach((item: any) => {
+      const zoneName = item.zone_name;
+      if (!zoneStats[zoneName]) {
+        zoneStats[zoneName] = {
+          zoneName,
           totalDemand: 0,
           count: 0,
         };
       }
-      zoneStats[zoneId].totalDemand += item.demand_ratio;
-      zoneStats[zoneId].count += 1;
+      zoneStats[zoneName].totalDemand += item.demand_ratio;
+      zoneStats[zoneName].count += 1;
     });
 
     return Object.values(zoneStats).map((zone: any) => ({
@@ -200,7 +192,8 @@ export class DemandAnalyticsService {
 
   // Prédictions de demande
   async predictDemand(hour: number, dayOfWeek: number, zoneId?: string): Promise<number> {
-    let query = this.supabase.client
+    const client = this.supabase.getClient();
+    let query = client
       .from('demand_analytics')
       .select('demand_ratio')
       .eq('hour_of_day', hour)
@@ -208,7 +201,7 @@ export class DemandAnalyticsService {
       .gte('recorded_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()); // 30 jours
 
     if (zoneId) {
-      query = query.eq('zone_id', zoneId);
+      query = query.eq('zone_name', zoneId);
     }
 
     const { data } = await query;
@@ -218,7 +211,7 @@ export class DemandAnalyticsService {
     }
 
     // Calculer la moyenne
-    const average = data.reduce((sum, item) => sum + item.demand_ratio, 0) / data.length;
+    const average = data.reduce((sum: number, item: any) => sum + item.demand_ratio, 0) / data.length;
     return Math.round(average * 100) / 100; // Arrondir à 2 décimales
   }
 }
