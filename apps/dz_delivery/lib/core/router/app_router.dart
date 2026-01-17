@@ -25,6 +25,10 @@ import '../../features/customer/presentation/screens/support_screen_v2.dart';
 import '../../features/customer/presentation/screens/filter_management_screen.dart';
 // Restaurant
 import '../../features/restaurant/presentation/screens/restaurant_dashboard_screen.dart';
+import '../../features/restaurant/presentation/screens/restaurant_home_screen_v3.dart';
+import '../../features/restaurant/presentation/screens/restaurant_orders_screen.dart';
+import '../../features/restaurant/presentation/screens/restaurant_finance_screen.dart';
+import '../../features/restaurant/presentation/screens/restaurant_order_history_screen.dart';
 import '../../features/restaurant/presentation/screens/kitchen_screen_v2.dart';
 import '../../features/restaurant/presentation/screens/stats_screen_v2.dart';
 import '../../features/restaurant/presentation/screens/stock_management_screen.dart';
@@ -69,6 +73,9 @@ class AppRouter {
   
   // Restaurant
   static const String restaurantHome = '/restaurant/home';
+  static const String restaurantOrders = '/restaurant/orders';
+  static const String restaurantFinance = '/restaurant/finance';
+  static const String restaurantOrderHistory = '/restaurant/order-history';
   static const String menu = '/restaurant/menu';
   static const String restaurantOrderDetail = '/restaurant/order';
   static const String stats = '/restaurant/stats';
@@ -145,7 +152,13 @@ class AppRouter {
       
       // Restaurant
       case restaurantHome:
-        return MaterialPageRoute(builder: (_) => const RestaurantDashboardScreen());
+        return MaterialPageRoute(builder: (_) => const RestaurantHomeScreenV3());
+      case restaurantOrders:
+        return MaterialPageRoute(builder: (_) => const RestaurantOrdersScreen());
+      case restaurantFinance:
+        return MaterialPageRoute(builder: (_) => const RestaurantFinanceScreen());
+      case restaurantOrderHistory:
+        return MaterialPageRoute(builder: (_) => const RestaurantOrderHistoryScreen());
       case menu:
         return MaterialPageRoute(builder: (_) => const MenuScreen());
       case restaurantOrderDetail:
