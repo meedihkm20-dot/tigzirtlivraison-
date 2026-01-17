@@ -125,8 +125,8 @@ export class DemandAnalyticsService {
       .order('day_of_week');
 
     return {
-      hourlyTrends: this.aggregateTrends(hourlyTrends, 'hour_of_day'),
-      weeklyTrends: this.aggregateTrends(weeklyTrends, 'day_of_week'),
+      hourlyTrends: this.aggregateTrends(hourlyTrends || [], 'hour_of_day'),
+      weeklyTrends: this.aggregateTrends(weeklyTrends || [], 'day_of_week'),
     };
   }
 
