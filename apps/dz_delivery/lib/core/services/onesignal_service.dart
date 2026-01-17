@@ -125,7 +125,7 @@ class OneSignalService {
   static Future<bool> areNotificationsEnabled() async {
     try {
       final subscription = OneSignal.User.pushSubscription;
-      return subscription.optedIn;
+      return subscription.optedIn ?? false;
     } catch (e) {
       debugPrint('❌ OneSignal areNotificationsEnabled error: $e');
       return false;
@@ -231,16 +231,16 @@ class OneSignalService {
       
       // Simuler une notification locale
       _showInAppNotification(
-        OSNotification(
-          notificationId: 'test-${DateTime.now().millisecondsSinceEpoch}',
-          title: '🧪 Test Notification',
-          body: 'Ceci est un test de notification OneSignal - ${DateTime.now().toString().substring(11, 19)}',
-          additionalData: {
+        OSNotification({
+          'notificationId': 'test-${DateTime.now().millisecondsSinceEpoch}',
+          'title': '🧪 Test Notification',
+          'body': 'Ceci est un test de notification OneSignal - ${DateTime.now().toString().substring(11, 19)}',
+          'additionalData': {
             'type': 'test',
             'order_id': 'test-order-123',
             'timestamp': DateTime.now().toIso8601String(),
           },
-        ),
+        }),
       );
       
       debugPrint('✅ Test notification affichée');

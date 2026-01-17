@@ -1735,19 +1735,6 @@ class SupabaseService {
   // PROFIL UTILISATEUR
   // ============================================
 
-  /// Récupérer le profil de l'utilisateur connecté
-  static Future<Map<String, dynamic>?> getProfile() async {
-    if (currentUserId == null) return null;
-    
-    final response = await client
-        .from('profiles')
-        .select()
-        .eq('id', currentUserId!)
-        .single();
-    
-    return response;
-  }
-
   /// Mettre à jour le profil utilisateur
   static Future<void> updateProfile(Map<String, dynamic> updates) async {
     if (currentUserId == null) throw Exception('Utilisateur non connecté');

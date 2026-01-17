@@ -147,7 +147,7 @@ class _SearchScreenV2State extends ConsumerState<SearchScreenV2> {
       }
       
       if (_selectedCategory != null) {
-        restaurantQuery = restaurantQuery.eq('cuisine_type', _selectedCategory);
+        restaurantQuery = restaurantQuery.eq('cuisine_type', _selectedCategory!);
       }
       
       if (_minRating > 0) {
