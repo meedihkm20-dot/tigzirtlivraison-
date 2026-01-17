@@ -24,7 +24,6 @@ import '../../features/customer/presentation/screens/search_screen_v2.dart';
 import '../../features/customer/presentation/screens/support_screen_v2.dart';
 import '../../features/customer/presentation/screens/filter_management_screen.dart';
 // Restaurant
-import '../../features/restaurant/presentation/screens/restaurant_dashboard_screen.dart';
 import '../../features/restaurant/presentation/screens/restaurant_home_screen_v3.dart';
 import '../../features/restaurant/presentation/screens/restaurant_orders_screen.dart';
 import '../../features/restaurant/presentation/screens/restaurant_finance_screen.dart';
