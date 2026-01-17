@@ -13,22 +13,21 @@ import '../../../../core/services/preferences_service.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../main.dart';
 
-/// Écran Profil Client V2 - Premium
-/// Gamification complète: niveaux, badges, fidélité, stats, parrainage
-class CustomerProfileScreenV2 extends StatefulWidget {
-  const CustomerProfileScreenV2({super.key});
+/// Écran Profil Livreur V2 - Moderne et complet
+class LivreurProfileScreenV2 extends StatefulWidget {
+  const LivreurProfileScreenV2({super.key});
 
   @override
-  State<CustomerProfileScreenV2> createState() => _CustomerProfileScreenV2State();
+  State<LivreurProfileScreenV2> createState() => _LivreurProfileScreenV2State();
 }
 
-class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
+class _LivreurProfileScreenV2State extends State<LivreurProfileScreenV2>
     with SingleTickerProviderStateMixin {
   bool _isLoading = true;
   
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _stats;
-  List<Map<String, dynamic>> _recentOrders = [];
+  List<Map<String, dynamic>> _recentDeliveries = [];
   
   late AnimationController _progressController;
   late Animation<double> _progressAnimation;
@@ -52,21 +51,20 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
     super.dispose();
   }
 
-
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
       final results = await Future.wait([
         _safeCall(() => SupabaseService.getProfile(), null),
-        _safeCall(() => SupabaseService.getCustomerStats(), <String, dynamic>{}),
-        _safeCall(() => SupabaseService.getRecentOrders(limit: 3), <Map<String, dynamic>>[]),
+        _safeCall(() => SupabaseService.getLivreurStats(), <String, dynamic>{}),
+        _safeCall(() => SupabaseService.getRecentDeliveries(limit: 5), <Map<String, dynamic>>[]),
       ]);
 
       if (mounted) {
         setState(() {
           _profile = results[0] as Map<String, dynamic>?;
           _stats = results[1] as Map<String, dynamic>;
-          _recentOrders = results[2] as List<Map<String, dynamic>>;
+          _recentDeliveries = results[2] as List<Map<String, dynamic>>;
           _isLoading = false;
         });
         _progressController.forward();
@@ -90,16 +88,17 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
     return Scaffold(
       backgroundColor: AppColors.background,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.clientPrimary))
+          ? const Center(child: CircularProgressIndicator(color: AppColors.livreurPrimary))
           : RefreshIndicator(
               onRefresh: _loadData,
-              color: AppColors.clientPrimary,
+              color: AppColors.livreurPrimary,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   _buildHeader(),
                   SliverToBoxAdapter(child: _buildStatsGrid()),
-                  SliverToBoxAdapter(child: _buildRecentOrders()),
+                  SliverToBoxAdapter(child: _buildVehicleInfo()),
+                  SliverToBoxAdapter(child: _buildRecentDeliveries()),
                   SliverToBoxAdapter(child: _buildMenuSection()),
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
@@ -109,14 +108,16 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
   }
 
   Widget _buildHeader() {
-    final name = _profile?['full_name'] ?? 'Client';
+    final name = _profile?['full_name'] ?? 'Livreur';
     final email = _profile?['email'] ?? '';
     final avatarUrl = _profile?['avatar_url'];
+    final rating = (_stats?['avg_rating'] as num?)?.toDouble() ?? 5.0;
+    final totalDeliveries = _stats?['total_deliveries'] ?? 0;
 
     return SliverAppBar(
       expandedHeight: 220,
       pinned: true,
-      backgroundColor: AppColors.clientPrimary,
+      backgroundColor: AppColors.livreurPrimary,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.white),
         onPressed: () => Navigator.pop(context),
@@ -129,7 +130,7 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
       ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
-          decoration: const BoxDecoration(gradient: AppColors.clientGradient),
+          decoration: const BoxDecoration(gradient: AppColors.livreurGradient),
           child: SafeArea(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -165,7 +166,7 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: AppColors.clientPrimary,
+                            color: AppColors.livreurPrimary,
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 2),
                             boxShadow: AppShadows.sm,
@@ -195,6 +196,35 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                     color: Colors.white.withOpacity(0.9),
                   ),
                 ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.star, color: Colors.amber, size: 18),
+                          const SizedBox(width: 4),
+                          Text(
+                            rating.toStringAsFixed(1),
+                            style: AppTypography.labelMedium.copyWith(color: Colors.white),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '• $totalDeliveries livraisons',
+                            style: AppTypography.labelMedium.copyWith(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -205,84 +235,42 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
 
   Widget _buildAvatarPlaceholder(String name) {
     return Container(
-      color: AppColors.clientPrimaryDark,
+      color: AppColors.livreurPrimaryDark,
       child: Center(
         child: Text(
-          name.isNotEmpty ? name[0].toUpperCase() : 'C',
+          name.isNotEmpty ? name[0].toUpperCase() : 'L',
           style: AppTypography.displayMedium.copyWith(color: Colors.white),
         ),
       ),
     );
   }
 
-  Widget _buildLoyaltyCard() {
-    // Gamification supprimée - interface simplifiée
-    return Container(
-      margin: AppSpacing.screen,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppSpacing.borderRadiusLg,
-        boxShadow: AppShadows.md,
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.primarySurface,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.star, color: AppColors.primary, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Programme de fidélité', style: AppTypography.titleMedium),
-                    Text(
-                      'Bientôt disponible',
-                      style: AppTypography.bodyMedium.copyWith(color: AppColors.textTertiary),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildStatsGrid() {
-    final totalOrders = _stats?['total_orders'] ?? 0;
-    final totalSpent = (_stats?['total_spent'] as num?)?.toDouble() ?? 0;
-    final avgRating = (_stats?['avg_rating'] as num?)?.toDouble() ?? 0;
-    final favoriteRestaurant = _stats?['favorite_restaurant'] ?? '-';
+    final totalEarnings = (_stats?['total_earnings'] as num?)?.toDouble() ?? 0;
+    final todayDeliveries = _stats?['today_deliveries'] ?? 0;
+    final weekEarnings = (_stats?['week_earnings'] as num?)?.toDouble() ?? 0;
+    final avgDeliveryTime = _stats?['avg_delivery_time'] ?? 0;
 
     return Padding(
       padding: AppSpacing.screenHorizontal,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Vos statistiques', style: AppTypography.titleMedium),
+          Text('Vos performances', style: AppTypography.titleMedium),
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildStatCard('🛒', '$totalOrders', 'Commandes')),
+              Expanded(child: _buildStatCard('💰', '${totalEarnings.toStringAsFixed(0)} DA', 'Gains totaux')),
               const SizedBox(width: 12),
-              Expanded(child: _buildStatCard('💰', '${(totalSpent / 1000).toStringAsFixed(1)}K', 'DA dépensés')),
+              Expanded(child: _buildStatCard('📦', '$todayDeliveries', 'Aujourd\'hui')),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildStatCard('⭐', avgRating.toStringAsFixed(1), 'Note moyenne')),
+              Expanded(child: _buildStatCard('📅', '${weekEarnings.toStringAsFixed(0)} DA', 'Cette semaine')),
               const SizedBox(width: 12),
-              Expanded(child: _buildStatCard('❤️', favoriteRestaurant, 'Favori')),
+              Expanded(child: _buildStatCard('⏱️', '${avgDeliveryTime} min', 'Temps moyen')),
             ],
           ),
         ],
@@ -318,73 +306,97 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
     );
   }
 
+  Widget _buildVehicleInfo() {
+    final vehicleType = _profile?['vehicle_type'] ?? 'moto';
+    final vehiclePlate = _profile?['vehicle_plate'] ?? '';
+    final vehicleModel = _profile?['vehicle_model'] ?? '';
 
-  Widget _buildBadgesSection() {
-    // Section badges supprimée - gamification simplifiée
-    return Padding(
-      padding: AppSpacing.screen,
+    return Container(
+      margin: AppSpacing.screen,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppSpacing.borderRadiusLg,
+        boxShadow: AppShadows.md,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Récompenses', style: AppTypography.titleMedium),
-              TextButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Bientôt disponible')),
-                  );
-                },
-                child: Text(
-                  'Bientôt',
-                  style: AppTypography.labelMedium.copyWith(color: AppColors.textTertiary),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.livreurSurface,
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: Icon(
+                  _getVehicleIcon(vehicleType),
+                  color: AppColors.livreurPrimary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Mon véhicule',
+                      style: AppTypography.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _getVehicleLabel(vehicleType),
+                      style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit, color: AppColors.textTertiary),
+                onPressed: _editVehicleInfo,
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: AppSpacing.borderRadiusMd,
+          if (vehiclePlate.isNotEmpty || vehicleModel.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 16),
+            if (vehicleModel.isNotEmpty)
+              _buildInfoRow('Modèle', vehicleModel),
+            if (vehiclePlate.isNotEmpty)
+              _buildInfoRow('Plaque', vehiclePlate),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: AppTypography.bodySmall.copyWith(color: AppColors.textTertiary),
             ),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(Icons.emoji_events, size: 48, color: AppColors.textTertiary),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Système de récompenses en développement',
-                    style: AppTypography.bodyMedium.copyWith(color: AppColors.textTertiary),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: AppTypography.bodyMedium,
             ),
           ),
         ],
       ),
     );
   }
-            const SizedBox(height: 8),
-            Text(
-              badge['name'] ?? '',
-              style: AppTypography.labelSmall.copyWith(
-                color: unlocked ? AppColors.textPrimary : AppColors.textTertiary,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildRecentOrders() {
+  Widget _buildRecentDeliveries() {
     return Padding(
       padding: AppSpacing.screenHorizontal,
       child: Column(
@@ -393,18 +405,18 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Commandes récentes', style: AppTypography.titleMedium),
+              Text('Livraisons récentes', style: AppTypography.titleMedium),
               TextButton(
-                onPressed: () => Navigator.pushNamed(context, AppRouter.customerOrders),
+                onPressed: () => Navigator.pushNamed(context, AppRouter.livreurHistory),
                 child: Text(
-                  'Historique',
-                  style: AppTypography.labelMedium.copyWith(color: AppColors.clientPrimary),
+                  'Voir tout',
+                  style: AppTypography.labelMedium.copyWith(color: AppColors.livreurPrimary),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          if (_recentOrders.isEmpty)
+          if (_recentDeliveries.isEmpty)
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -414,10 +426,10 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
               child: Center(
                 child: Column(
                   children: [
-                    const Icon(Icons.receipt_long, size: 48, color: AppColors.textTertiary),
+                    const Icon(Icons.delivery_dining, size: 48, color: AppColors.textTertiary),
                     const SizedBox(height: 12),
                     Text(
-                      'Aucune commande récente',
+                      'Aucune livraison récente',
                       style: AppTypography.bodyMedium.copyWith(color: AppColors.textTertiary),
                     ),
                   ],
@@ -425,84 +437,82 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
               ),
             )
           else
-            ..._recentOrders.map((order) => _buildOrderItem(order)),
+            ..._recentDeliveries.take(3).map((delivery) => _buildDeliveryItem(delivery)),
         ],
       ),
     );
   }
 
-  Widget _buildOrderItem(Map<String, dynamic> order) {
-    final status = order['status'] ?? 'pending';
-    final total = (order['total'] as num?)?.toDouble() ?? 0;
-    final date = order['created_at'] != null 
-        ? DateTime.parse(order['created_at'])
+  Widget _buildDeliveryItem(Map<String, dynamic> delivery) {
+    final status = delivery['status'] ?? 'delivered';
+    final earnings = (delivery['livreur_earnings'] as num?)?.toDouble() ?? 0;
+    final date = delivery['delivered_at'] != null 
+        ? DateTime.parse(delivery['delivered_at'])
         : DateTime.now();
 
-    return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, AppRouter.orderTracking, arguments: order['id']),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: AppSpacing.borderRadiusMd,
-          boxShadow: AppShadows.sm,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: AppColors.getStatusColor(status).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                _getStatusIcon(status),
-                color: AppColors.getStatusColor(status),
-              ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppSpacing.borderRadiusMd,
+        boxShadow: AppShadows.sm,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: AppColors.getStatusColor(status).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    order['restaurant_name'] ?? 'Restaurant',
-                    style: AppTypography.titleSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${date.day}/${date.month}/${date.year} • ${total.toStringAsFixed(0)} DA',
-                    style: AppTypography.bodySmall.copyWith(color: AppColors.textTertiary),
-                  ),
-                ],
-              ),
+            child: Icon(
+              Icons.check_circle,
+              color: AppColors.getStatusColor(status),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.getStatusColor(status).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                _getStatusLabel(status),
-                style: AppTypography.labelSmall.copyWith(
-                  color: AppColors.getStatusColor(status),
-                  fontWeight: FontWeight.w600,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  delivery['restaurant_name'] ?? 'Restaurant',
+                  style: AppTypography.titleSmall,
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  '${date.day}/${date.month}/${date.year} • ${earnings.toStringAsFixed(0)} DA',
+                  style: AppTypography.bodySmall.copyWith(color: AppColors.textTertiary),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.success.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Livrée',
+              style: AppTypography.labelSmall.copyWith(
+                color: AppColors.success,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildMenuSection() {
     final menuItems = [
-      {'icon': Icons.location_on, 'label': 'Mes adresses', 'route': AppRouter.savedAddresses},
-      {'icon': Icons.favorite, 'label': 'Favoris', 'route': AppRouter.favorites},
+      {'icon': Icons.history, 'label': 'Historique', 'route': AppRouter.livreurHistory},
+      {'icon': Icons.account_balance_wallet, 'label': 'Gains', 'route': AppRouter.earnings},
+      {'icon': Icons.map, 'label': 'Carte des restaurants', 'route': null, 'action': 'map'},
       {'icon': Icons.notifications, 'label': 'Notifications', 'route': AppRouter.notifications},
       {'icon': Icons.bug_report, 'label': 'Test Notifications', 'route': null, 'action': 'test_notifications'},
       {'icon': Icons.help_outline, 'label': 'Aide & Support', 'route': null},
@@ -534,10 +544,10 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: AppColors.clientSurface,
+                          color: AppColors.livreurSurface,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(item['icon'] as IconData, color: AppColors.clientPrimary, size: 20),
+                        child: Icon(item['icon'] as IconData, color: AppColors.livreurPrimary, size: 20),
                       ),
                       title: Text(item['label'] as String, style: AppTypography.bodyMedium),
                       trailing: const Icon(Icons.chevron_right, color: AppColors.textTertiary),
@@ -548,6 +558,8 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                         
                         if (action == 'test_notifications') {
                           _testNotifications();
+                        } else if (action == 'map') {
+                          Navigator.pushNamed(context, '/livreur/map');
                         } else if (route != null) {
                           Navigator.pushNamed(context, route);
                         }
@@ -585,25 +597,21 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
   // HELPERS & ACTIONS
   // ============================================
 
-  IconData _getStatusIcon(String status) {
-    switch (status) {
-      case 'delivered': return Icons.check_circle;
-      case 'cancelled': return Icons.cancel;
-      case 'picked_up': return Icons.delivery_dining;
-      default: return Icons.pending;
+  IconData _getVehicleIcon(String? type) {
+    switch (type) {
+      case 'moto': return Icons.two_wheeler;
+      case 'velo': return Icons.pedal_bike;
+      case 'voiture': return Icons.directions_car;
+      default: return Icons.delivery_dining;
     }
   }
 
-  String _getStatusLabel(String status) {
-    switch (status) {
-      case 'pending': return 'En attente';
-      case 'confirmed': return 'Confirmée';
-      case 'preparing': return 'Préparation';
-      case 'ready': return 'Prête';
-      case 'picked_up': return 'En route';
-      case 'delivered': return 'Livrée';
-      case 'cancelled': return 'Annulée';
-      default: return status;
+  String _getVehicleLabel(String? type) {
+    switch (type) {
+      case 'moto': return 'Moto';
+      case 'velo': return 'Vélo';
+      case 'voiture': return 'Voiture';
+      default: return 'Non défini';
     }
   }
 
@@ -634,14 +642,13 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                 value: PreferencesService.isDarkMode,
                 onChanged: (value) async {
                   await PreferencesService.setDarkMode(value);
-                  // Mettre à jour le thème de l'app
                   if (mounted) {
                     DZDeliveryApp.setThemeMode(
                       value ? ThemeMode.dark : ThemeMode.light,
                     );
                   }
                 },
-                activeColor: AppColors.clientPrimary,
+                activeColor: AppColors.livreurPrimary,
               ),
             ),
             ListTile(
@@ -653,41 +660,12 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                 _showLanguageSelector();
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.delete_forever, color: AppColors.error),
-              title: Text('Supprimer le compte', style: TextStyle(color: AppColors.error)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showDeleteAccountDialog();
-              },
-            ),
           ],
         ),
       ),
     );
   }
 
-  void _showDeleteAccountDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Supprimer le compte?'),
-        content: const Text('Cette action est irréversible. Toutes vos données seront supprimées.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              // TODO: Delete account
-            },
-            child: Text('Supprimer', style: TextStyle(color: AppColors.error)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Changer la photo de profil
   void _changeProfilePicture() async {
     HapticFeedback.lightImpact();
     
@@ -758,12 +736,12 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: (color ?? AppColors.clientPrimary).withOpacity(0.1),
+              color: (color ?? AppColors.livreurPrimary).withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               icon,
-              color: color ?? AppColors.clientPrimary,
+              color: color ?? AppColors.livreurPrimary,
               size: 28,
             ),
           ),
@@ -780,7 +758,6 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
     );
   }
 
-  /// Sélectionner et uploader une image
   void _pickImage(ImageSource source) async {
     try {
       final ImagePicker picker = ImagePicker();
@@ -793,30 +770,24 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
 
       if (image == null) return;
 
-      // Afficher un loader
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => const Center(
-          child: CircularProgressIndicator(color: AppColors.clientPrimary),
+          child: CircularProgressIndicator(color: AppColors.livreurPrimary),
         ),
       );
 
-      // Upload vers Supabase Storage
       final bytes = await image.readAsBytes();
       final userId = SupabaseService.currentUserId;
       final fileName = 'avatar_${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       
       final avatarUrl = await SupabaseService.uploadAvatar(fileName, bytes);
-      
-      // Mettre à jour le profil
       await SupabaseService.updateProfile({'avatar_url': avatarUrl});
-      
-      // Recharger les données
       await _loadData();
       
       if (mounted) {
-        Navigator.pop(context); // Fermer le loader
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Photo de profil mise à jour! 📸'),
@@ -826,7 +797,7 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // Fermer le loader
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur: ${e.toString()}'),
@@ -837,14 +808,13 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
     }
   }
 
-  /// Supprimer la photo de profil
   void _removeProfilePicture() async {
     try {
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => const Center(
-          child: CircularProgressIndicator(color: AppColors.clientPrimary),
+          child: CircularProgressIndicator(color: AppColors.livreurPrimary),
         ),
       );
 
@@ -852,7 +822,7 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
       await _loadData();
       
       if (mounted) {
-        Navigator.pop(context); // Fermer le loader
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Photo de profil supprimée'),
@@ -873,21 +843,15 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
     }
   }
 
-  /// Obtenir le label de la langue
   String _getLanguageLabel(String languageCode) {
     switch (languageCode) {
-      case 'fr':
-        return 'Français';
-      case 'ar':
-        return 'العربية';
-      case 'en':
-        return 'English';
-      default:
-        return 'Français';
+      case 'fr': return 'Français';
+      case 'ar': return 'العربية';
+      case 'en': return 'English';
+      default: return 'Français';
     }
   }
 
-  /// Afficher le sélecteur de langue
   void _showLanguageSelector() {
     final languages = [
       {'code': 'fr', 'name': 'Français', 'flag': '🇫🇷'},
@@ -905,7 +869,7 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
             leading: Text(lang['flag']!, style: const TextStyle(fontSize: 24)),
             title: Text(lang['name']!),
             trailing: PreferencesService.language == lang['code']
-                ? const Icon(Icons.check, color: AppColors.clientPrimary)
+                ? const Icon(Icons.check, color: AppColors.livreurPrimary)
                 : null,
             onTap: () async {
               await PreferencesService.setLanguage(lang['code']!);
@@ -917,8 +881,6 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                     backgroundColor: AppColors.success,
                   ),
                 );
-                // Note: Pour une implémentation complète, il faudrait redémarrer l'app
-                // ou utiliser un système d'internationalisation comme flutter_localizations
               }
             },
           )).toList(),
@@ -933,7 +895,6 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
     );
   }
 
-  /// Éditer le profil utilisateur
   void _editProfile() {
     final nameController = TextEditingController(text: _profile?['full_name'] ?? '');
     final phoneController = TextEditingController(text: _profile?['phone'] ?? '');
@@ -986,12 +947,11 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
               try {
                 Navigator.pop(ctx);
                 
-                // Afficher loader
                 showDialog(
                   context: context,
                   barrierDismissible: false,
                   builder: (ctx) => const Center(
-                    child: CircularProgressIndicator(color: AppColors.clientPrimary),
+                    child: CircularProgressIndicator(color: AppColors.livreurPrimary),
                   ),
                 );
                 
@@ -1003,7 +963,7 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                 await _loadData();
                 
                 if (mounted) {
-                  Navigator.pop(context); // Fermer loader
+                  Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Profil mis à jour! ✅'),
@@ -1013,7 +973,7 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                 }
               } catch (e) {
                 if (mounted) {
-                  Navigator.pop(context); // Fermer loader
+                  Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Erreur: ${e.toString()}'),
@@ -1024,12 +984,130 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.clientPrimary,
+              backgroundColor: AppColors.livreurPrimary,
               foregroundColor: Colors.white,
             ),
             child: const Text('Sauvegarder'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _editVehicleInfo() {
+    String selectedVehicleType = _profile?['vehicle_type'] ?? 'moto';
+    final plateController = TextEditingController(text: _profile?['vehicle_plate'] ?? '');
+    final modelController = TextEditingController(text: _profile?['vehicle_model'] ?? '');
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Informations véhicule'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: selectedVehicleType,
+                decoration: const InputDecoration(
+                  labelText: 'Type de véhicule',
+                  prefixIcon: Icon(Icons.directions_car),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'moto', child: Text('Moto')),
+                  DropdownMenuItem(value: 'velo', child: Text('Vélo')),
+                  DropdownMenuItem(value: 'voiture', child: Text('Voiture')),
+                ],
+                onChanged: (value) {
+                  setState(() => selectedVehicleType = value!);
+                },
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: modelController,
+                decoration: const InputDecoration(
+                  labelText: 'Modèle (optionnel)',
+                  prefixIcon: Icon(Icons.info),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: plateController,
+                decoration: const InputDecoration(
+                  labelText: 'Plaque d\'immatriculation (optionnel)',
+                  prefixIcon: Icon(Icons.confirmation_number),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  Navigator.pop(ctx);
+                  
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (ctx) => const Center(
+                      child: CircularProgressIndicator(color: AppColors.livreurPrimary),
+                    ),
+                  );
+                  
+                  await SupabaseService.updateProfile({
+                    'vehicle_type': selectedVehicleType,
+                    'vehicle_model': modelController.text.trim().isNotEmpty ? modelController.text.trim() : null,
+                    'vehicle_plate': plateController.text.trim().isNotEmpty ? plateController.text.trim() : null,
+                  });
+                  
+                  await _loadData();
+                  
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Informations véhicule mises à jour! 🚗'),
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Erreur: ${e.toString()}'),
+                        backgroundColor: AppColors.error,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.livreurPrimary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Sauvegarder'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _testNotifications() async {
+    HapticFeedback.lightImpact();
+    
+    await OneSignalService.sendTestNotification();
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('🧪 Notification de test envoyée!'),
+        backgroundColor: AppColors.success,
       ),
     );
   }
@@ -1057,150 +1135,5 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
         Navigator.pushNamedAndRemoveUntil(context, AppRouter.login, (route) => false);
       }
     }
-  }
-
-  /// Test des notifications OneSignal
-  void _testNotifications() async {
-    HapticFeedback.lightImpact();
-    
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('🧪 Test Notifications'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Tester les notifications OneSignal:'),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.notifications_active, color: AppColors.clientPrimary),
-              title: const Text('Notification de test'),
-              subtitle: const Text('Affiche une notification locale'),
-              onTap: () {
-                Navigator.pop(ctx);
-                OneSignalService.sendTestNotification();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('🧪 Notification de test envoyée!'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.info, color: AppColors.textSecondary),
-              title: const Text('Statut OneSignal'),
-              subtitle: FutureBuilder<bool>(
-                future: OneSignalService.areNotificationsEnabled(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasData) {
-                    return Text(
-                      snapshot.data! ? '✅ Activées' : '❌ Désactivées',
-                      style: TextStyle(
-                        color: snapshot.data! ? AppColors.success : AppColors.error,
-                      ),
-                    );
-                  }
-                  return const Text('Vérification...');
-                },
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.fingerprint, color: AppColors.textSecondary),
-              title: const Text('Player ID'),
-              subtitle: FutureBuilder<String?>(
-                future: OneSignalService.getPlayerId(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasData && snapshot.data != null) {
-                    return Text(
-                      snapshot.data!.length > 8 
-                          ? '${snapshot.data!.substring(0, 8)}...'
-                          : snapshot.data!,
-                      style: const TextStyle(fontFamily: 'monospace'),
-                    );
-                  }
-                  return const Text('Non disponible');
-                },
-              ),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.bug_report, color: AppColors.warning),
-              title: const Text('Debug complet'),
-              subtitle: const Text('Afficher toutes les infos'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showDebugInfo();
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Afficher les informations de debug OneSignal
-  void _showDebugInfo() async {
-    final debugInfo = await OneSignalService.getDebugInfo();
-    
-    if (!mounted) return;
-    
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('🔍 Debug OneSignal'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ...debugInfo.entries.map((entry) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 120,
-                      child: Text(
-                        '${entry.key}:',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        entry.value?.toString() ?? 'null',
-                        style: const TextStyle(fontFamily: 'monospace'),
-                      ),
-                    ),
-                  ],
-                ),
-              )),
-              const SizedBox(height: 16),
-              const Text(
-                'Si Player ID est null, les notifications ne fonctionneront pas.',
-                style: TextStyle(
-                  color: AppColors.warning,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
-    );
   }
 }

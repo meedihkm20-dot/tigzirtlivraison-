@@ -37,6 +37,7 @@ class RoutingService {
                 distance: (step['distance'] as num).toDouble(),
                 duration: (step['duration'] as num).toDouble(),
                 name: step['name'] ?? '',
+                maneuver: step['maneuver']['type'] ?? '',
               ));
             }
           }
@@ -138,13 +139,25 @@ class NavigationStep {
   final double distance;
   final double duration;
   final String name;
+  final String maneuver;
 
   NavigationStep({
     required this.instruction,
     required this.distance,
     required this.duration,
     required this.name,
+    this.maneuver = '',
   });
 
   String get formattedDistance => RoutingService.formatDistance(distance);
+
+  static NavigationStep empty() {
+    return NavigationStep(
+      instruction: 'Aucune instruction',
+      distance: 0,
+      duration: 0,
+      name: '',
+      maneuver: '',
+    );
+  }
 }

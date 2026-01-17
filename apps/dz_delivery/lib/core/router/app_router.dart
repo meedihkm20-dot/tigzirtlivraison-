@@ -44,6 +44,10 @@ import '../../features/livreur/presentation/screens/delivery_screen_v2.dart';
 import '../../features/livreur/presentation/screens/livreur_history_screen_v2.dart';
 import '../../features/livreur/presentation/screens/earnings_screen_v2.dart';
 import '../../features/livreur/presentation/screens/tier_progress_screen_v2.dart';
+import '../../features/livreur/presentation/screens/livreur_map_screen.dart';
+import '../../features/livreur/presentation/screens/livreur_profile_screen_v2.dart';
+import '../../features/livreur/presentation/screens/livreur_orders_screen.dart';
+import '../../features/shared/presentation/delivery_chat_screen.dart';
 
 class AppRouter {
   // Auth
@@ -84,6 +88,10 @@ class AppRouter {
   static const String badges = '/livreur/badges';
   static const String tierProgress = '/livreur/tier-progress';
   static const String livreurHistory = '/livreur/history';
+  static const String livreurMap = '/livreur/map';
+  static const String livreurOrders = '/livreur/orders';
+  static const String livreurMessages = '/livreur/messages';
+  static const String deliveryChat = '/livreur/delivery-chat';
   
   // Customer extras
   static const String notifications = '/customer/notifications';
@@ -175,6 +183,19 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const TierProgressScreenV2());
       case livreurHistory:
         return MaterialPageRoute(builder: (_) => const LivreurHistoryScreenV2());
+      case livreurMap:
+        return MaterialPageRoute(builder: (_) => const LivreurMapScreen());
+      case livreurOrders:
+        return MaterialPageRoute(builder: (_) => const LivreurOrdersScreen());
+      case livreurMessages:
+        return MaterialPageRoute(builder: (_) => const LivreurHistoryScreenV2()); // Temporaire
+      case deliveryChat:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(builder: (_) => DeliveryChatScreen(
+          orderId: args['orderId'],
+          recipientName: args['recipientName'],
+          recipientType: args['recipientType'],
+        ));
       
       // Customer extras
       case notifications:

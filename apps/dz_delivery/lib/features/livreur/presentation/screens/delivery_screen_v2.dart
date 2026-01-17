@@ -11,7 +11,7 @@ import '../../../../core/design_system/theme/app_spacing.dart';
 import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/backend_api_service.dart';
-import '../../../../core/router/app_router.dart';
+import '../../../../core/services/voice_navigation_service.dart';
 
 /// Écran Livraison V2 - Premium
 /// Navigation OSM temps réel, instructions vocales, code confirmation
@@ -43,6 +43,7 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
   late AnimationController _pulseController;
   StreamSubscription<Position>? _positionStream;
   Timer? _locationUpdateTimer;
+  NavigationTracker? _navigationTracker;
 
   @override
   void initState() {
@@ -52,6 +53,10 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
+    
+    // Initialiser la navigation vocale
+    VoiceNavigationService.init();
+    
     _loadOrder();
     _startLocationTracking();
   }
@@ -61,6 +66,7 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
     _pulseController.dispose();
     _positionStream?.cancel();
     _locationUpdateTimer?.cancel();
+    VoiceNavigationService.stop();
     super.dispose();
   }
 
@@ -120,8 +126,16 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
         setState(() {
           _currentPosition = LatLng(position.latitude, position.longitude);
         });
+        
+        // Mettre à jour le tracker de navigation
+        _navigationTracker?.updatePosition(_currentPosition!);
+        
         _updateLocationOnServer();
-        _loadRoute();
+        
+        // Recharger la route seulement si nécessaire (pas à chaque position)
+        if (_routePoints.isEmpty) {
+          _loadRoute();
+        }
       }
     });
 
@@ -145,16 +159,52 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
     if (destination == null) return;
 
     try {
-      final route = await SupabaseService.getRoute(_currentPosition!, destination);
-      final routeInfo = await SupabaseService.getRouteInfo(_currentPosition!, destination);
+      final route = await RoutingService.getRoute(_currentPosition!, destination);
       
-      if (mounted) {
+      if (route != null && mounted) {
         setState(() {
-          _routePoints = List<LatLng>.from(route);
-          _etaMinutes = routeInfo['duration'] ?? 0;
-          _distanceKm = routeInfo['distance'] ?? 0;
-          _nextInstruction = routeInfo['instruction'] ?? 'Continuez tout droit';
+          _routePoints = route.points;
+          _etaMinutes = (route.durationSeconds / 60).round();
+          _distanceKm = route.distanceMeters / 1000;
+          _nextInstruction = route.steps.isNotEmpty ? route.steps.first.instruction : 'Continuez tout droit';
         });
+
+        // Initialiser le tracker de navigation
+        _navigationTracker = NavigationTracker(
+          route: route,
+          destination: destination,
+          destinationType: _currentStep,
+          onRerouteNeeded: () {
+            VoiceNavigationService.announceRerouting(reason: 'Écart de route détecté');
+            _loadRoute(); // Recalculer la route
+          },
+          onStepChanged: (stepIndex) {
+            if (route.steps.isNotEmpty && stepIndex < route.steps.length) {
+              final step = route.steps[stepIndex];
+              setState(() => _nextInstruction = step.instruction);
+              VoiceNavigationService.checkAndAnnounce(
+                currentPosition: _currentPosition!,
+                route: route,
+                currentStepIndex: stepIndex,
+                destinationType: _currentStep,
+              );
+            }
+          },
+          onArrival: () {
+            VoiceNavigationService.announceArrival(
+              _currentStep,
+              locationName: _currentStep == 'pickup' 
+                  ? _order?['restaurant_name'] 
+                  : _order?['customer_name'],
+            );
+          },
+          onTimingAlert: (alertType, minutes) {
+            VoiceNavigationService.announceTimingAlert(alertType, minutes);
+          },
+          onTrafficAlert: (alertType) {
+            VoiceNavigationService.announceTrafficAlert(alertType);
+          },
+        );
       }
     } catch (e) {
       debugPrint('Erreur route: $e');
@@ -275,6 +325,35 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
                       boxShadow: AppShadows.md,
                     ),
                     child: const Icon(Icons.my_location, size: 20, color: AppColors.livreurPrimary),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      VoiceNavigationService.setEnabled(!VoiceNavigationService.isEnabled);
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(VoiceNavigationService.isEnabled 
+                            ? 'Navigation vocale activée' 
+                            : 'Navigation vocale désactivée'),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: VoiceNavigationService.isEnabled ? AppColors.success : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: AppShadows.md,
+                    ),
+                    child: Icon(
+                      VoiceNavigationService.isEnabled ? Icons.volume_up : Icons.volume_off,
+                      size: 20,
+                      color: VoiceNavigationService.isEnabled ? Colors.white : AppColors.textTertiary,
+                    ),
                   ),
                 ),
               ],
@@ -790,10 +869,7 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
 
   void _speakInstruction() {
     HapticFeedback.lightImpact();
-    // TODO: Implement TTS
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(_nextInstruction)),
-    );
+    VoiceNavigationService.speak(_nextInstruction);
   }
 
   void _callContact(String phone) async {
@@ -819,16 +895,17 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
   }
 
   void _openChat() {
-    Navigator.pushNamed(context, AppRouter.chat, arguments: {
-      'orderId': widget.orderId,
-      'recipientName': _currentStep == 'pickup' 
-          ? (_order?['restaurant_name'] as String? ?? 'Restaurant')
-          : (_order?['customer_name'] as String? ?? 'Client'),
-      'recipientPhone': _currentStep == 'pickup'
-          ? (_order?['restaurant_phone'] as String?)
-          : (_order?['customer_phone'] as String?),
-      'isLivreur': true,
-    });
+    Navigator.pushNamed(
+      context,
+      AppRouter.deliveryChat,
+      arguments: {
+        'orderId': widget.orderId,
+        'recipientName': _currentStep == 'pickup' 
+            ? (_order?['restaurant_name'] as String? ?? 'Restaurant')
+            : (_order?['customer_name'] as String? ?? 'Client'),
+        'recipientType': _currentStep == 'pickup' ? 'restaurant' : 'customer',
+      },
+    );
   }
 
   void _confirmPickup() async {
@@ -836,8 +913,14 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
     try {
       final backendApi = BackendApiService(SupabaseService.client);
       await backendApi.changeOrderStatus(widget.orderId, 'picked_up');
+      
+      // Annoncer le changement de statut
+      VoiceNavigationService.announceDeliveryStatus('picked_up');
+      
       setState(() => _currentStep = 'delivery');
+      VoiceNavigationService.reset(); // Reset pour la nouvelle étape
       _loadRoute();
+      
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Commande récupérée! En route vers le client 🚀'), backgroundColor: AppColors.success),
       );
@@ -908,6 +991,10 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
     HapticFeedback.heavyImpact();
     try {
       await SupabaseService.confirmDelivery(widget.orderId, code);
+      
+      // Annoncer la livraison terminée
+      VoiceNavigationService.announceDeliveryStatus('delivered');
+      
       if (mounted) {
         _showSuccessDialog();
       }

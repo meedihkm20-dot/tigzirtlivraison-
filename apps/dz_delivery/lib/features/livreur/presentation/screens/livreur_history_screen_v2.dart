@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
@@ -7,27 +9,50 @@ import '../../../../core/design_system/theme/app_spacing.dart';
 import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../providers/providers.dart';
 
 /// Écran Historique Livreur V2 - Premium
-/// Liste des livraisons terminées avec filtres et stats
-class LivreurHistoryScreenV2 extends StatefulWidget {
+/// Liste des livraisons terminées avec filtres, stats et analytics
+class LivreurHistoryScreenV2 extends ConsumerStatefulWidget {
   const LivreurHistoryScreenV2({super.key});
 
   @override
-  State<LivreurHistoryScreenV2> createState() => _LivreurHistoryScreenV2State();
+  ConsumerState<LivreurHistoryScreenV2> createState() => _LivreurHistoryScreenV2State();
 }
 
-class _LivreurHistoryScreenV2State extends State<LivreurHistoryScreenV2> {
+class _LivreurHistoryScreenV2State extends ConsumerState<LivreurHistoryScreenV2>
+    with TickerProviderStateMixin {
   bool _isLoading = true;
   List<Map<String, dynamic>> _deliveries = [];
   String _selectedFilter = 'all'; // all, today, week, month
+  bool _showAnalytics = false;
   
+  late AnimationController _analyticsController;
   final _dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
+    _analyticsController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
     _loadHistory();
+    _startAutoRefresh();
+  }
+
+  @override
+  void dispose() {
+    _analyticsController.dispose();
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startAutoRefresh() {
+    _refreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      _loadHistory();
+    });
   }
 
   Future<void> _loadHistory() async {
@@ -91,12 +116,19 @@ class _LivreurHistoryScreenV2State extends State<LivreurHistoryScreenV2> {
         backgroundColor: AppColors.livreurPrimary,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(_showAnalytics ? Icons.analytics_outlined : Icons.analytics),
+            onPressed: _toggleAnalytics,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.livreurPrimary))
           : Column(
               children: [
                 _buildStatsCard(filtered.length, totalEarnings, totalTips),
+                if (_showAnalytics) _buildAnalyticsCard(filtered),
                 _buildFilters(),
                 Expanded(
                   child: filtered.isEmpty
@@ -359,5 +391,139 @@ class _LivreurHistoryScreenV2State extends State<LivreurHistoryScreenV2> {
         ),
       ),
     );
+  }
+  
+  void _toggleAnalytics() {
+    setState(() => _showAnalytics = !_showAnalytics);
+    if (_showAnalytics) {
+      _analyticsController.forward();
+    } else {
+      _analyticsController.reverse();
+    }
+  }
+
+  Widget _buildAnalyticsCard(List<Map<String, dynamic>> deliveries) {
+    if (deliveries.isEmpty) return const SizedBox.shrink();
+
+    final avgEarnings = deliveries.fold<double>(0, (sum, d) => 
+      sum + ((d['delivery_fee'] as num?)?.toDouble() ?? 0)) / deliveries.length;
+    
+    final avgDistance = deliveries.fold<double>(0, (sum, d) => 
+      sum + ((d['distance'] as num?)?.toDouble() ?? 0)) / deliveries.length;
+    
+    final avgRating = deliveries.where((d) => d['livreur_rating'] != null)
+        .fold<double>(0, (sum, d) => sum + (d['livreur_rating'] as int)) / 
+        deliveries.where((d) => d['livreur_rating'] != null).length;
+
+    final topRestaurants = _getTopRestaurants(deliveries);
+    final hourlyStats = _getHourlyStats(deliveries);
+
+    return AnimatedBuilder(
+      animation: _analyticsController,
+      child: Container(
+        margin: AppSpacing.screen,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: AppSpacing.borderRadiusLg,
+          boxShadow: AppShadows.md,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Analytics détaillées', style: AppTypography.titleMedium),
+            const SizedBox(height: 16),
+            
+            // Moyennes
+            Row(
+              children: [
+                Expanded(child: _buildAnalyticItem('💰', '${avgEarnings.toStringAsFixed(0)} DA', 'Gain moyen')),
+                Expanded(child: _buildAnalyticItem('📍', '${avgDistance.toStringAsFixed(1)} km', 'Distance moy.')),
+                Expanded(child: _buildAnalyticItem('⭐', avgRating.isNaN ? 'N/A' : avgRating.toStringAsFixed(1), 'Note moyenne')),
+              ],
+            ),
+            
+            const Divider(height: 24),
+            
+            // Top restaurants
+            Text('Top Restaurants', style: AppTypography.titleSmall),
+            const SizedBox(height: 8),
+            ...topRestaurants.take(3).map((r) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(r['name'], style: AppTypography.bodyMedium),
+                  Text('${r['count']} livraisons', style: AppTypography.labelMedium.copyWith(color: AppColors.textTertiary)),
+                ],
+              ),
+            )),
+            
+            const Divider(height: 24),
+            
+            // Heures de pointe
+            Text('Heures de pointe', style: AppTypography.titleSmall),
+            const SizedBox(height: 8),
+            ...hourlyStats.take(3).map((h) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('${h['hour']}h - ${h['hour'] + 1}h', style: AppTypography.bodyMedium),
+                  Text('${h['count']} livraisons', style: AppTypography.labelMedium.copyWith(color: AppColors.textTertiary)),
+                ],
+              ),
+            )),
+          ],
+        ),
+      ),
+      builder: (context, child) => Transform.scale(
+        scale: 0.8 + (_analyticsController.value * 0.2),
+        child: Opacity(
+          opacity: _analyticsController.value,
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnalyticItem(String emoji, String value, String label) {
+    return Column(
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 20)),
+        const SizedBox(height: 4),
+        Text(value, style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.bold)),
+        Text(label, style: AppTypography.labelSmall.copyWith(color: AppColors.textTertiary)),
+      ],
+    );
+  }
+
+  List<Map<String, dynamic>> _getTopRestaurants(List<Map<String, dynamic>> deliveries) {
+    final Map<String, int> restaurantCounts = {};
+    
+    for (final delivery in deliveries) {
+      final name = delivery['restaurant_name'] as String? ?? 'Restaurant';
+      restaurantCounts[name] = (restaurantCounts[name] ?? 0) + 1;
+    }
+    
+    final sorted = restaurantCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    
+    return sorted.map((e) => {'name': e.key, 'count': e.value}).toList();
+  }
+
+  List<Map<String, dynamic>> _getHourlyStats(List<Map<String, dynamic>> deliveries) {
+    final Map<int, int> hourlyCounts = {};
+    
+    for (final delivery in deliveries) {
+      final date = DateTime.parse(delivery['delivered_at'] ?? delivery['created_at']);
+      final hour = date.hour;
+      hourlyCounts[hour] = (hourlyCounts[hour] ?? 0) + 1;
+    }
+    
+    final sorted = hourlyCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    
+    return sorted.map((e) => {'hour': e.key, 'count': e.value}).toList();
   }
 }

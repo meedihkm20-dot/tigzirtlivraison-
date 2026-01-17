@@ -74,27 +74,10 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
     });
   }
 
-  // ✅ Getters utilisant le provider
+  // ✅ Getters simplifiés - gamification réduite de 75%
   String get _tierName {
     final tierInfo = ref.read(livreurProvider).tierInfo;
-    return tierInfo?['tier'] ?? 'Bronze';
-  }
-  
-  Color get _tierColor {
-    switch (_tierName.toLowerCase()) {
-      case 'diamond': return AppColors.tierDiamond;
-      case 'gold': return AppColors.tierGold;
-      case 'silver': return AppColors.tierSilver;
-      default: return AppColors.tierBronze;
-    }
-  }
-  LinearGradient get _tierGradient {
-    switch (_tierName.toLowerCase()) {
-      case 'diamond': return AppColors.diamondGradient;
-      case 'gold': return AppColors.goldGradient;
-      case 'silver': return AppColors.silverGradient;
-      default: return AppColors.bronzeGradient;
-    }
+    return tierInfo?['tier'] ?? 'Standard';
   }
 
   @override
@@ -174,25 +157,19 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
                                 style: AppTypography.labelMedium.copyWith(color: Colors.white),
                               ),
                               const SizedBox(width: 12),
+                              // Niveau simplifié - pas de gamification excessive
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  gradient: _tierGradient,
+                                  color: AppColors.livreurSurface,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.workspace_premium, color: Colors.white, size: 14),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      _tierName,
-                                      style: AppTypography.labelSmall.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
+                                child: Text(
+                                  _tierName,
+                                  style: AppTypography.labelSmall.copyWith(
+                                    color: AppColors.livreurPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ],
@@ -473,11 +450,11 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
             children: [
               Expanded(child: _buildActionButton(Icons.account_balance_wallet, 'Gains', AppRouter.earnings)),
               const SizedBox(width: 12),
-              Expanded(child: _buildActionButton(Icons.emoji_events, 'Niveau', AppRouter.tierProgress)),
+              Expanded(child: _buildActionButton(Icons.map, 'Carte', AppRouter.livreurMap)),
               const SizedBox(width: 12),
               Expanded(child: _buildActionButton(Icons.history, 'Historique', AppRouter.livreurHistory)),
               const SizedBox(width: 12),
-              Expanded(child: _buildActionButton(Icons.map, 'Zones', null)),
+              Expanded(child: _buildActionButton(Icons.chat, 'Messages', AppRouter.livreurMessages)),
             ],
           ),
         ],
@@ -742,8 +719,8 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
             children: [
               _buildNavItem(0, Icons.home, 'Accueil', true),
               _buildNavItem(1, Icons.map, 'Carte', false),
-              _buildNavItem(2, Icons.account_balance_wallet, 'Gains', false),
-              _buildNavItem(3, Icons.emoji_events, 'Niveau', false),
+              _buildNavItem(2, Icons.list_alt, 'Commandes', false),
+              _buildNavItem(3, Icons.account_balance_wallet, 'Gains', false),
               _buildNavItem(4, Icons.person_outline, 'Profil', false),
             ],
           ),
@@ -757,11 +734,14 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
       onTap: () {
         HapticFeedback.selectionClick();
         switch (index) {
+          case 1:
+            Navigator.pushNamed(context, AppRouter.livreurMap);
+            break;
           case 2:
-            Navigator.pushNamed(context, AppRouter.earnings);
+            Navigator.pushNamed(context, AppRouter.livreurOrders);
             break;
           case 3:
-            Navigator.pushNamed(context, AppRouter.tierProgress);
+            Navigator.pushNamed(context, AppRouter.earnings);
             break;
           case 4:
             Navigator.pushNamed(context, AppRouter.livreurProfile);
