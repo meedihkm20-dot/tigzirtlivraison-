@@ -21,6 +21,7 @@ import '../../features/customer/presentation/screens/cart_screen_v2.dart';
 import '../../features/customer/presentation/screens/order_tracking_screen_v2.dart';
 import '../../features/customer/presentation/screens/customer_profile_screen_v2.dart';
 import '../../features/customer/presentation/screens/search_screen_v2.dart';
+import '../../features/customer/presentation/screens/support_screen_v2.dart';
 // Restaurant
 import '../../features/restaurant/presentation/screens/restaurant_dashboard_screen.dart';
 import '../../features/restaurant/presentation/screens/kitchen_screen_v2.dart';
@@ -59,6 +60,7 @@ class AppRouter {
   static const String customerProfile = '/customer/profile';
   static const String review = '/customer/review';
   static const String search = '/customer/search';
+  static const String support = '/customer/support';
   
   // Restaurant
   static const String restaurantHome = '/restaurant/home';
@@ -125,6 +127,8 @@ class AppRouter {
           initialQuery: args?['query'],
           categoryFilter: args?['category'],
         ));
+      case support:
+        return MaterialPageRoute(builder: (_) => const SupportScreenV2());
       
       // Restaurant
       case restaurantHome:
@@ -187,6 +191,7 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => ChatScreen(
           orderId: args['orderId'],
           recipientName: args['recipientName'],
+          recipientPhone: args['recipientPhone'],
           isLivreur: args['isLivreur'] ?? false,
         ));
       case review:

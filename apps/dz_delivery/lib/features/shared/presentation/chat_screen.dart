@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -8,12 +9,14 @@ import '../../../core/theme/app_theme.dart';
 class ChatScreen extends StatefulWidget {
   final String orderId;
   final String recipientName;
+  final String? recipientPhone;
   final bool isLivreur; // true si c'est le livreur qui utilise le chat
   
   const ChatScreen({
     super.key,
     required this.orderId,
     required this.recipientName,
+    this.recipientPhone,
     this.isLivreur = false,
   });
 
@@ -136,12 +139,11 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.phone),
-            onPressed: () {
-              // TODO: Appeler
-            },
-          ),
+          if (widget.recipientPhone != null)
+            IconButton(
+              icon: const Icon(Icons.phone),
+              onPressed: () => _makePhoneCall(widget.recipientPhone!),
+            ),
         ],
       ),
       body: Column(
@@ -299,6 +301,27 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String _formatTime(DateTime date) {
     return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Impossible de lancer l\'appel')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e')),
+        );
+      }
+    }
   }
 
   @override

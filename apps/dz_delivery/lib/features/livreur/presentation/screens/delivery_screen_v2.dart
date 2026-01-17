@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
 import '../../../../core/design_system/theme/app_spacing.dart';
@@ -795,12 +796,26 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
     );
   }
 
-  void _callContact(String phone) {
+  void _callContact(String phone) async {
     HapticFeedback.lightImpact();
-    // TODO: Implement call
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Appel: $phone')),
-    );
+    final Uri phoneUri = Uri(scheme: 'tel', path: phone);
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Impossible de lancer l\'appel')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e')),
+        );
+      }
+    }
   }
 
   void _openChat() {
@@ -809,6 +824,9 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
       'recipientName': _currentStep == 'pickup' 
           ? (_order?['restaurant_name'] as String? ?? 'Restaurant')
           : (_order?['customer_name'] as String? ?? 'Client'),
+      'recipientPhone': _currentStep == 'pickup'
+          ? (_order?['restaurant_phone'] as String?)
+          : (_order?['customer_phone'] as String?),
       'isLivreur': true,
     });
   }

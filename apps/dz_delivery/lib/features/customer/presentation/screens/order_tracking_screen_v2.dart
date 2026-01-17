@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
 import '../../../../core/design_system/theme/app_spacing.dart';
@@ -899,12 +900,33 @@ class _OrderTrackingScreenV2State extends State<OrderTrackingScreenV2>
     }
   }
 
-  void _callLivreur() {
+  void _callLivreur() async {
     HapticFeedback.lightImpact();
-    // TODO: Implement call
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Appel du livreur...')),
-    );
+    final phone = _livreur?['phone'] as String?;
+    if (phone != null) {
+      final Uri phoneUri = Uri(scheme: 'tel', path: phone);
+      try {
+        if (await canLaunchUrl(phoneUri)) {
+          await launchUrl(phoneUri);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Impossible de lancer l\'appel')),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur: $e')),
+          );
+        }
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Numéro de téléphone non disponible')),
+      );
+    }
   }
 
   void _openChat() {
@@ -912,15 +934,14 @@ class _OrderTrackingScreenV2State extends State<OrderTrackingScreenV2>
     Navigator.pushNamed(context, AppRouter.chat, arguments: {
       'orderId': widget.orderId,
       'recipientName': _livreur?['full_name'] ?? 'Livreur',
+      'recipientPhone': _livreur?['phone'] as String?,
       'isLivreur': false,
     });
   }
 
   void _contactSupport() {
     HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Contact support...')),
-    );
+    Navigator.pushNamed(context, AppRouter.support);
   }
 
   void _shareTracking() {
