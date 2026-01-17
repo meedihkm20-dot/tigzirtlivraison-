@@ -295,7 +295,7 @@ class DeliveryPrice {
       basePrice: (data['basePrice'] as num).toDouble(),
       finalPrice: (data['finalPrice'] as num).toDouble(),
       distance: distance,
-      estimatedTime: _calculateEstimatedTime(distance, WeatherCondition.clear),
+      estimatedTime: DeliveryPricingService._calculateEstimatedTime(distance, WeatherCondition.clear),
       factors: warnings,
       multiplier: multipliers.values.fold(1.0, (a, b) => a * (b as num).toDouble()),
       calculationId: data['calculationId'],

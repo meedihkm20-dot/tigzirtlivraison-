@@ -911,20 +911,6 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
     }
   }
 
-  void _openChat() {
-    Navigator.pushNamed(
-      context,
-      AppRouter.deliveryChat,
-      arguments: {
-        'orderId': widget.orderId,
-        'recipientName': _currentStep == 'pickup' 
-            ? (_order?['restaurant_name'] as String? ?? 'Restaurant')
-            : (_order?['customer_name'] as String? ?? 'Client'),
-        'recipientType': _currentStep == 'pickup' ? 'restaurant' : 'customer',
-      },
-    );
-  }
-
   void _confirmPickup() async {
     HapticFeedback.heavyImpact();
     try {

@@ -161,7 +161,7 @@ class _EarningsDashboardScreenV2State extends ConsumerState<EarningsDashboardScr
 
   Future<Map<String, dynamic>> _loadCurrentOpportunities() async {
     final currentHour = DateTime.now().hour;
-    final demand = await DeliveryPricingService.getCurrentDemand();
+    final demand = _simulateDemand(currentHour);
     
     return {
       'currentDemand': demand,
