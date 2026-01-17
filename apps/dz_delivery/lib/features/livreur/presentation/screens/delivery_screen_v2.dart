@@ -837,7 +837,22 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _openChat,
+                  icon: const Icon(Icons.chat, color: AppColors.info),
+                  label: Text(
+                    'Chat',
+                    style: TextStyle(color: AppColors.info),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.info),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _openNavigation,
@@ -1098,6 +1113,20 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Problème signalé au support')),
     );
+  }
+
+  void _openChat() {
+    if (_order != null) {
+      Navigator.pushNamed(
+        context,
+        AppRouter.deliveryChat,
+        arguments: {
+          'orderId': _order!['id'],
+          'recipientType': 'customer',
+          'recipientName': _order!['customer_name'] ?? 'Client',
+        },
+      );
+    }
   }
 
   void _cancelDelivery() async {

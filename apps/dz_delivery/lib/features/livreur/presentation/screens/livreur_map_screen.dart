@@ -87,9 +87,9 @@ class _LivreurMapScreenState extends State<LivreurMapScreen> {
     try {
       final restaurants = await SupabaseService.client
           .from('restaurants')
-          .select('*, profiles!inner(*)')
-          .eq('profiles.status', 'approved')
-          .eq('is_active', true);
+          .select('*')
+          .eq('is_active', true)
+          .eq('is_open', true);
       
       setState(() {
         _restaurants = List<Map<String, dynamic>>.from(restaurants);
@@ -384,6 +384,7 @@ class _LivreurMapScreenState extends State<LivreurMapScreen> {
             heroTag: 'zoom_in',
             onPressed: () => _mapController.move(_mapController.camera.center, _mapController.camera.zoom + 1),
             backgroundColor: AppColors.surface,
+            foregroundColor: AppColors.textPrimary,
             child: const Icon(Icons.add),
           ),
           const SizedBox(height: 8),
@@ -391,6 +392,7 @@ class _LivreurMapScreenState extends State<LivreurMapScreen> {
             heroTag: 'zoom_out',
             onPressed: () => _mapController.move(_mapController.camera.center, _mapController.camera.zoom - 1),
             backgroundColor: AppColors.surface,
+            foregroundColor: AppColors.textPrimary,
             child: const Icon(Icons.remove),
           ),
         ],

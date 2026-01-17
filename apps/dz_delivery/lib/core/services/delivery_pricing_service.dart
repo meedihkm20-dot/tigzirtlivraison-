@@ -1,10 +1,17 @@
 import 'dart:math';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:dio/dio.dart';
+import 'backend_api_service.dart';
+import 'supabase_service.dart';
 
 /// Service de calcul de prix de livraison dynamique
+/// Intégré avec le backend NestJS pour pricing intelligent
 class DeliveryPricingService {
-  // Prix de base et coefficients
+  static final Dio _dio = Dio();
+  static const String _baseUrl = 'https://tigzirt-backend.koyeb.app';
+  
+  // Prix de base et coefficients (fallback)
   static const double _basePriceDA = 200.0; // Prix de base en DA
   static const double _pricePerKmDA = 50.0; // Prix par kilomètre
   static const double _nightSurcharge = 0.3; // +30% la nuit (20h-6h)
@@ -17,7 +24,113 @@ class DeliveryPricingService {
   static const int _nightEndHour = 6; // 6h
   static const List<int> _rushHours = [12, 13, 19, 20, 21]; // Heures de pointe
   
-  /// Calculer le prix de livraison
+  /// Calculer le prix de livraison avec backend intelligent
+  static Future<DeliveryPrice> calculatePriceAdvanced({
+    required LatLng restaurantLocation,
+    required LatLng deliveryLocation,
+    String? orderId,
+    String? livreurId,
+    DateTime? orderTime,
+    WeatherCondition? weather,
+    VehicleType vehicleType = VehicleType.moto,
+    bool hasRainGear = false,
+    bool isUrgent = false,
+  }) async {
+    try {
+      final distance = _calculateDistance(restaurantLocation, deliveryLocation);
+      
+      // Appel au backend pour calcul intelligent
+      final response = await _dio.post(
+        '$_baseUrl/pricing/calculate',
+        data: {
+          'orderId': orderId,
+          'livreurId': livreurId,
+          'distance': distance,
+          'restaurantLatitude': restaurantLocation.latitude,
+          'restaurantLongitude': restaurantLocation.longitude,
+          'deliveryLatitude': deliveryLocation.latitude,
+          'deliveryLongitude': deliveryLocation.longitude,
+          'vehicleType': vehicleType.name.toUpperCase(),
+          'hasRainGear': hasRainGear,
+          'weatherOverride': weather?.name.toUpperCase(),
+        },
+        options: Options(
+          headers: await _getAuthHeaders(),
+          validateStatus: (status) => status! < 500,
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        return DeliveryPrice.fromBackend(data, distance);
+      } else {
+        // Fallback vers calcul local
+        return calculatePrice(
+          restaurantLocation: restaurantLocation,
+          deliveryLocation: deliveryLocation,
+          orderTime: orderTime,
+          weather: weather ?? WeatherCondition.clear,
+          isUrgent: isUrgent,
+        );
+      }
+    } catch (e) {
+      print('Erreur calcul pricing backend: $e');
+      // Fallback vers calcul local
+      return calculatePrice(
+        restaurantLocation: restaurantLocation,
+        deliveryLocation: deliveryLocation,
+        orderTime: orderTime,
+        weather: weather ?? WeatherCondition.clear,
+        isUrgent: isUrgent,
+      );
+    }
+  }
+
+  /// Obtenir les prédictions de gains pour un livreur
+  static Future<EarningsPrediction?> getEarningsPredictions(String livreurId) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrl/pricing/earnings-prediction/$livreurId',
+        options: Options(headers: await _getAuthHeaders()),
+      );
+
+      if (response.statusCode == 200) {
+        return EarningsPrediction.fromJson(response.data);
+      }
+    } catch (e) {
+      print('Erreur prédictions gains: $e');
+    }
+    return null;
+  }
+
+  /// Obtenir les opportunités temps réel
+  static Future<List<PricingOpportunity>> getRealTimeOpportunities() async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrl/pricing/opportunities',
+        options: Options(headers: await _getAuthHeaders()),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((item) => PricingOpportunity.fromJson(item)).toList();
+      }
+    } catch (e) {
+      print('Erreur opportunités: $e');
+    }
+    return [];
+  }
+
+  /// Headers d'authentification
+  static Future<Map<String, String>> _getAuthHeaders() async {
+    final session = SupabaseService.client.auth.currentSession;
+    return {
+      'Content-Type': 'application/json',
+      if (session?.accessToken != null)
+        'Authorization': 'Bearer ${session!.accessToken}',
+    };
+  }
+  /// Calculer le prix de livraison (méthode locale de fallback)
   static DeliveryPrice calculatePrice({
     required LatLng restaurantLocation,
     required LatLng deliveryLocation,
@@ -156,6 +269,9 @@ class DeliveryPrice {
   final int estimatedTime;
   final List<String> factors;
   final double multiplier;
+  final String? calculationId;
+  final Map<String, double>? multipliers;
+  final Map<String, double>? bonuses;
   
   const DeliveryPrice({
     required this.basePrice,
@@ -164,7 +280,29 @@ class DeliveryPrice {
     required this.estimatedTime,
     required this.factors,
     required this.multiplier,
+    this.calculationId,
+    this.multipliers,
+    this.bonuses,
   });
+
+  /// Créer depuis la réponse backend
+  factory DeliveryPrice.fromBackend(Map<String, dynamic> data, double distance) {
+    final multipliers = data['multipliers'] as Map<String, dynamic>? ?? {};
+    final bonuses = data['bonuses'] as Map<String, dynamic>? ?? {};
+    final warnings = List<String>.from(data['warnings'] ?? []);
+    
+    return DeliveryPrice(
+      basePrice: (data['basePrice'] as num).toDouble(),
+      finalPrice: (data['finalPrice'] as num).toDouble(),
+      distance: distance,
+      estimatedTime: _calculateEstimatedTime(distance, WeatherCondition.clear),
+      factors: warnings,
+      multiplier: multipliers.values.fold(1.0, (a, b) => a * (b as num).toDouble()),
+      calculationId: data['calculationId'],
+      multipliers: multipliers.map((k, v) => MapEntry(k, (v as num).toDouble())),
+      bonuses: bonuses.map((k, v) => MapEntry(k, (v as num).toDouble())),
+    );
+  }
   
   /// Prix formaté en DA
   String get formattedPrice => '${finalPrice.toStringAsFixed(0)} DA';
@@ -233,4 +371,100 @@ extension WeatherConditionExtension on WeatherCondition {
            this == WeatherCondition.storm || 
            this == WeatherCondition.fog;
   }
+}
+
+/// Types de véhicules
+enum VehicleType {
+  moto,
+  velo,
+  voiture,
+}
+
+/// Prédictions de gains
+class EarningsPrediction {
+  final double todayPrediction;
+  final double weekPrediction;
+  final double monthPrediction;
+  final List<HourlyPrediction> hourlyPredictions;
+  final List<String> recommendations;
+
+  const EarningsPrediction({
+    required this.todayPrediction,
+    required this.weekPrediction,
+    required this.monthPrediction,
+    required this.hourlyPredictions,
+    required this.recommendations,
+  });
+
+  factory EarningsPrediction.fromJson(Map<String, dynamic> json) {
+    return EarningsPrediction(
+      todayPrediction: (json['todayPrediction'] as num).toDouble(),
+      weekPrediction: (json['weekPrediction'] as num).toDouble(),
+      monthPrediction: (json['monthPrediction'] as num).toDouble(),
+      hourlyPredictions: (json['hourlyPredictions'] as List)
+          .map((item) => HourlyPrediction.fromJson(item))
+          .toList(),
+      recommendations: List<String>.from(json['recommendations'] ?? []),
+    );
+  }
+}
+
+/// Prédiction par heure
+class HourlyPrediction {
+  final int hour;
+  final double expectedEarnings;
+  final double demandMultiplier;
+  final String description;
+
+  const HourlyPrediction({
+    required this.hour,
+    required this.expectedEarnings,
+    required this.demandMultiplier,
+    required this.description,
+  });
+
+  factory HourlyPrediction.fromJson(Map<String, dynamic> json) {
+    return HourlyPrediction(
+      hour: json['hour'],
+      expectedEarnings: (json['expectedEarnings'] as num).toDouble(),
+      demandMultiplier: (json['demandMultiplier'] as num).toDouble(),
+      description: json['description'] ?? '',
+    );
+  }
+}
+
+/// Opportunité de pricing temps réel
+class PricingOpportunity {
+  final String id;
+  final String zoneName;
+  final double multiplier;
+  final int availableOrders;
+  final String description;
+  final double estimatedEarnings;
+  final int durationMinutes;
+
+  const PricingOpportunity({
+    required this.id,
+    required this.zoneName,
+    required this.multiplier,
+    required this.availableOrders,
+    required this.description,
+    required this.estimatedEarnings,
+    required this.durationMinutes,
+  });
+
+  factory PricingOpportunity.fromJson(Map<String, dynamic> json) {
+    return PricingOpportunity(
+      id: json['id'],
+      zoneName: json['zoneName'],
+      multiplier: (json['multiplier'] as num).toDouble(),
+      availableOrders: json['availableOrders'],
+      description: json['description'],
+      estimatedEarnings: (json['estimatedEarnings'] as num).toDouble(),
+      durationMinutes: json['durationMinutes'],
+    );
+  }
+
+  String get formattedEarnings => '${estimatedEarnings.toStringAsFixed(0)} DA';
+  String get formattedMultiplier => 'x${multiplier.toStringAsFixed(1)}';
 }

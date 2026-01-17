@@ -9,6 +9,7 @@ import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/backend_api_service.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/services/delivery_pricing_service.dart';
 import '../../../../providers/providers.dart';
 
 /// Écran Accueil Livreur V2 - Premium
@@ -23,6 +24,7 @@ class LivreurHomeScreenV2 extends ConsumerStatefulWidget {
 class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
     with TickerProviderStateMixin {
   bool _isLoading = true;
+  List<PricingOpportunity> _opportunities = [];
   
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -56,12 +58,26 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
       // ✅ Utiliser le provider pour charger les données
       await ref.read(livreurProvider.notifier).loadAll();
       
+      // ✅ Charger les opportunités de pricing
+      _loadPricingOpportunities();
+      
       if (mounted) {
         setState(() => _isLoading = false);
       }
     } catch (e) {
       debugPrint('Erreur chargement: $e');
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadPricingOpportunities() async {
+    try {
+      final opportunities = await DeliveryPricingService.getRealTimeOpportunities();
+      if (mounted) {
+        setState(() => _opportunities = opportunities);
+      }
+    } catch (e) {
+      debugPrint('Erreur opportunités pricing: $e');
     }
   }
 
@@ -102,6 +118,8 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
                   if (currentDelivery != null)
                     SliverToBoxAdapter(child: _buildCurrentDelivery(currentDelivery)),
                   SliverToBoxAdapter(child: _buildTodayStats()),
+                  if (_opportunities.isNotEmpty)
+                    SliverToBoxAdapter(child: _buildPricingOpportunities()),
                   SliverToBoxAdapter(child: _buildQuickActions()),
                   SliverToBoxAdapter(child: _buildAvailableOrders(isOnline)),
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
@@ -448,13 +466,13 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
           const SizedBox(height: 12),
           Row(
             children: [
+              Expanded(child: _buildActionButton(Icons.trending_up, 'Dashboard', AppRouter.earningsDashboard)),
+              const SizedBox(width: 12),
               Expanded(child: _buildActionButton(Icons.account_balance_wallet, 'Gains', AppRouter.earnings)),
               const SizedBox(width: 12),
               Expanded(child: _buildActionButton(Icons.map, 'Carte', AppRouter.livreurMap)),
               const SizedBox(width: 12),
               Expanded(child: _buildActionButton(Icons.history, 'Historique', AppRouter.livreurHistory)),
-              const SizedBox(width: 12),
-              Expanded(child: _buildActionButton(Icons.chat, 'Messages', AppRouter.livreurMessages)),
             ],
           ),
         ],
@@ -932,5 +950,109 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
         );
       }
     }
+  }
+
+  Widget _buildPricingOpportunities() {
+    return Padding(
+      padding: AppSpacing.screen,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('🔥 Opportunités temps réel', style: AppTypography.titleMedium),
+              GestureDetector(
+                onTap: () => Navigator.pushNamed(context, AppRouter.earningsDashboard),
+                child: Text(
+                  'Voir tout',
+                  style: AppTypography.labelMedium.copyWith(color: AppColors.livreurPrimary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 120,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _opportunities.length,
+              itemBuilder: (context, index) {
+                final opportunity = _opportunities[index];
+                return Container(
+                  width: 200,
+                  margin: EdgeInsets.only(right: index < _opportunities.length - 1 ? 12 : 0),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.warning.withOpacity(0.1),
+                        AppColors.warning.withOpacity(0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: AppSpacing.borderRadiusMd,
+                    border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            opportunity.zoneName,
+                            style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              opportunity.formattedMultiplier,
+                              style: AppTypography.labelSmall.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        opportunity.description,
+                        style: AppTypography.bodySmall.copyWith(color: AppColors.textTertiary),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Spacer(),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${opportunity.availableOrders} commandes',
+                            style: AppTypography.labelSmall.copyWith(color: AppColors.textTertiary),
+                          ),
+                          Text(
+                            opportunity.formattedEarnings,
+                            style: AppTypography.labelMedium.copyWith(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

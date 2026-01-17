@@ -1,8 +1,15 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:table_calendar/table_calendar.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
 import '../../../../core/design_system/theme/app_spacing.dart';
@@ -26,6 +33,12 @@ class _LivreurHistoryScreenV2State extends ConsumerState<LivreurHistoryScreenV2>
   List<Map<String, dynamic>> _deliveries = [];
   String _selectedFilter = 'all'; // all, today, week, month
   bool _showAnalytics = false;
+  bool _showCalendar = false;
+  
+  // Calendrier
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
+  CalendarFormat _calendarFormat = CalendarFormat.month;
   
   late AnimationController _analyticsController;
   final _dateFormat = DateFormat('dd/MM/yyyy HH:mm');
@@ -92,10 +105,20 @@ class _LivreurHistoryScreenV2State extends ConsumerState<LivreurHistoryScreenV2>
           final date = DateTime.parse(d['delivered_at'] ?? d['created_at']);
           return date.year == now.year && date.month == now.month;
         }).toList();
+      case 'custom':
+        if (_selectedDay != null) {
+          return _deliveries.where((d) {
+            final date = DateTime.parse(d['delivered_at'] ?? d['created_at']);
+            return isSameDay(date, _selectedDay!);
+          }).toList();
+        }
+        return _deliveries;
       default:
         return _deliveries;
     }
   }
+
+  List<Map<String, dynamic>> _getFilteredDeliveries() => _filteredDeliveries;
 
   @override
   Widget build(BuildContext context) {
@@ -118,8 +141,19 @@ class _LivreurHistoryScreenV2State extends ConsumerState<LivreurHistoryScreenV2>
         elevation: 0,
         actions: [
           IconButton(
+            icon: Icon(_showCalendar ? Icons.calendar_today : Icons.calendar_month),
+            onPressed: () => setState(() => _showCalendar = !_showCalendar),
+            tooltip: 'Calendrier',
+          ),
+          IconButton(
+            icon: const Icon(Icons.file_download),
+            onPressed: _showExportOptions,
+            tooltip: 'Exporter',
+          ),
+          IconButton(
             icon: Icon(_showAnalytics ? Icons.analytics_outlined : Icons.analytics),
             onPressed: _toggleAnalytics,
+            tooltip: 'Analytics',
           ),
         ],
       ),
@@ -128,6 +162,7 @@ class _LivreurHistoryScreenV2State extends ConsumerState<LivreurHistoryScreenV2>
           : Column(
               children: [
                 _buildStatsCard(filtered.length, totalEarnings, totalTips),
+                if (_showCalendar) _buildCalendar(),
                 if (_showAnalytics) _buildAnalyticsCard(filtered),
                 _buildFilters(),
                 Expanded(
@@ -399,6 +434,267 @@ class _LivreurHistoryScreenV2State extends ConsumerState<LivreurHistoryScreenV2>
       _analyticsController.forward();
     } else {
       _analyticsController.reverse();
+    }
+  }
+
+  Widget _buildCalendar() {
+    return Container(
+      margin: AppSpacing.screen,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppSpacing.borderRadiusLg,
+        boxShadow: AppShadows.md,
+      ),
+      child: TableCalendar<Map<String, dynamic>>(
+        firstDay: DateTime.utc(2020, 1, 1),
+        lastDay: DateTime.utc(2030, 12, 31),
+        focusedDay: _focusedDay,
+        calendarFormat: _calendarFormat,
+        eventLoader: _getEventsForDay,
+        startingDayOfWeek: StartingDayOfWeek.monday,
+        calendarStyle: CalendarStyle(
+          outsideDaysVisible: false,
+          selectedDecoration: BoxDecoration(
+            color: AppColors.livreurPrimary,
+            shape: BoxShape.circle,
+          ),
+          todayDecoration: BoxDecoration(
+            color: AppColors.livreurPrimary.withOpacity(0.5),
+            shape: BoxShape.circle,
+          ),
+          markerDecoration: BoxDecoration(
+            color: AppColors.success,
+            shape: BoxShape.circle,
+          ),
+        ),
+        headerStyle: HeaderStyle(
+          formatButtonVisible: true,
+          titleCentered: true,
+          formatButtonShowsNext: false,
+          formatButtonDecoration: BoxDecoration(
+            color: AppColors.livreurPrimary,
+            borderRadius: BorderRadius.circular(12.0),
+          ),
+          formatButtonTextStyle: const TextStyle(
+            color: Colors.white,
+          ),
+        ),
+        onDaySelected: _onDaySelected,
+        onFormatChanged: (format) {
+          if (_calendarFormat != format) {
+            setState(() => _calendarFormat = format);
+          }
+        },
+        onPageChanged: (focusedDay) {
+          _focusedDay = focusedDay;
+        },
+        selectedDayPredicate: (day) {
+          return isSameDay(_selectedDay, day);
+        },
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _getEventsForDay(DateTime day) {
+    return _deliveries.where((delivery) {
+      final deliveryDate = DateTime.parse(delivery['delivered_at'] ?? delivery['created_at']);
+      return isSameDay(deliveryDate, day);
+    }).toList();
+  }
+
+  void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
+    if (!isSameDay(_selectedDay, selectedDay)) {
+      setState(() {
+        _selectedDay = selectedDay;
+        _focusedDay = focusedDay;
+        _selectedFilter = 'custom';
+      });
+    }
+  }
+
+  void _showExportOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Exporter les données', style: AppTypography.titleMedium),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf, color: AppColors.error),
+              title: const Text('Rapport PDF'),
+              subtitle: const Text('Générer un rapport détaillé'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportToPDF();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.receipt, color: AppColors.info),
+              title: const Text('Bon de livraison'),
+              subtitle: const Text('Imprimer les bons de livraison'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _generateDeliveryReceipts();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.share, color: AppColors.success),
+              title: const Text('Partager les données'),
+              subtitle: const Text('Exporter au format CSV'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _shareData();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportToPDF() async {
+    try {
+      final pdf = pw.Document();
+      final filtered = _getFilteredDeliveries();
+      final totalEarnings = filtered.fold<double>(0, (sum, d) => 
+        sum + ((d['delivery_fee'] as num?)?.toDouble() ?? 0));
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Header(
+                  level: 0,
+                  child: pw.Text('Rapport de Livraisons - DZ Delivery'),
+                ),
+                pw.SizedBox(height: 20),
+                pw.Text('Période: ${_getFilterLabel()}'),
+                pw.Text('Total livraisons: ${filtered.length}'),
+                pw.Text('Gains totaux: ${totalEarnings.toStringAsFixed(0)} DA'),
+                pw.SizedBox(height: 20),
+                pw.Table.fromTextArray(
+                  headers: ['Date', 'Restaurant', 'Montant', 'Statut'],
+                  data: filtered.map((delivery) => [
+                    _dateFormat.format(DateTime.parse(delivery['created_at'])),
+                    delivery['restaurant_name'] ?? 'N/A',
+                    '${delivery['delivery_fee'] ?? 0} DA',
+                    delivery['status'] ?? 'N/A',
+                  ]).toList(),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur génération PDF: $e')),
+      );
+    }
+  }
+
+  Future<void> _generateDeliveryReceipts() async {
+    try {
+      final filtered = _getFilteredDeliveries();
+      final pdf = pw.Document();
+
+      for (final delivery in filtered) {
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            build: (pw.Context context) {
+              return pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('BON DE LIVRAISON', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 20),
+                  pw.Text('Commande #${delivery['id']?.toString().substring(0, 8) ?? 'N/A'}'),
+                  pw.Text('Date: ${_dateFormat.format(DateTime.parse(delivery['created_at']))}'),
+                  pw.Text('Restaurant: ${delivery['restaurant_name'] ?? 'N/A'}'),
+                  pw.Text('Client: ${delivery['customer_name'] ?? 'N/A'}'),
+                  pw.Text('Adresse: ${delivery['delivery_address'] ?? 'N/A'}'),
+                  pw.Text('Montant: ${delivery['total'] ?? 0} DA'),
+                  pw.Text('Frais livraison: ${delivery['delivery_fee'] ?? 0} DA'),
+                  pw.SizedBox(height: 40),
+                  pw.Text('Signature livreur: ___________________'),
+                  pw.SizedBox(height: 20),
+                  pw.Text('Signature client: ___________________'),
+                ],
+              );
+            },
+          ),
+        );
+      }
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur génération bons: $e')),
+      );
+    }
+  }
+
+  Future<void> _shareData() async {
+    try {
+      final filtered = _getFilteredDeliveries();
+      final csvData = StringBuffer();
+      
+      // En-têtes CSV
+      csvData.writeln('Date,Restaurant,Client,Montant,Frais Livraison,Statut');
+      
+      // Données
+      for (final delivery in filtered) {
+        csvData.writeln([
+          _dateFormat.format(DateTime.parse(delivery['created_at'])),
+          delivery['restaurant_name'] ?? 'N/A',
+          delivery['customer_name'] ?? 'N/A',
+          delivery['total'] ?? 0,
+          delivery['delivery_fee'] ?? 0,
+          delivery['status'] ?? 'N/A',
+        ].join(','));
+      }
+
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/livraisons_${DateTime.now().millisecondsSinceEpoch}.csv');
+      await file.writeAsString(csvData.toString());
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Données de livraisons - ${_getFilterLabel()}',
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur partage: $e')),
+      );
+    }
+  }
+
+  String _getFilterLabel() {
+    switch (_selectedFilter) {
+      case 'today': return 'Aujourd\'hui';
+      case 'week': return '7 derniers jours';
+      case 'month': return 'Ce mois';
+      case 'custom': return _selectedDay != null ? 
+        DateFormat('dd/MM/yyyy').format(_selectedDay!) : 'Personnalisé';
+      default: return 'Toutes les livraisons';
     }
   }
 

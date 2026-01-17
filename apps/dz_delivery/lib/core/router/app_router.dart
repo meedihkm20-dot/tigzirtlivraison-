@@ -46,6 +46,7 @@ import '../../features/livreur/presentation/screens/tier_progress_screen_v2.dart
 import '../../features/livreur/presentation/screens/livreur_map_screen.dart';
 import '../../features/livreur/presentation/screens/livreur_profile_screen_v2.dart';
 import '../../features/livreur/presentation/screens/livreur_orders_screen.dart';
+import '../../features/livreur/presentation/screens/earnings_dashboard_screen_v2.dart';
 import '../../features/shared/presentation/delivery_chat_screen.dart';
 
 class AppRouter {
@@ -91,6 +92,7 @@ class AppRouter {
   static const String livreurOrders = '/livreur/orders';
   static const String livreurMessages = '/livreur/messages';
   static const String deliveryChat = '/livreur/delivery-chat';
+  static const String earningsDashboard = '/livreur/earnings-dashboard';
   
   // Customer extras
   static const String notifications = '/customer/notifications';
@@ -195,6 +197,8 @@ class AppRouter {
           userType: args['recipientType'],
           otherUserName: args['recipientName'],
         ));
+      case earningsDashboard:
+        return MaterialPageRoute(builder: (_) => const EarningsDashboardScreenV2());
       
       // Customer extras
       case notifications:

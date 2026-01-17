@@ -56,19 +56,32 @@ class _LivreurOrdersScreenState extends ConsumerState<LivreurOrdersScreen>
     setState(() => _isLoading = true);
     try {
       final livreurState = ref.read(livreurProvider);
+      final livreurId = livreurState.userProfile?.id;
       
-      // Charger commandes acceptées
-      final accepted = await SupabaseService.getAvailableOrders();
-      
-      // Charger commandes disponibles
-      final available = await SupabaseService.getAvailableOrders();
-      
-      if (mounted) {
-        setState(() {
-          _acceptedOrders = accepted;
-          _availableOrders = available;
-          _isLoading = false;
-        });
+      if (livreurId != null) {
+        // Charger commandes acceptées par ce livreur (statuts: confirmed, preparing, ready, picked_up, delivering)
+        final accepted = await SupabaseService.client
+            .from('orders')
+            .select('*, restaurants(*), profiles(*)')
+            .eq('livreur_id', livreurId)
+            .inFilter('status', ['confirmed', 'preparing', 'ready', 'picked_up', 'delivering'])
+            .order('created_at', ascending: false);
+        
+        // Charger commandes disponibles (statut pending, sans livreur assigné)
+        final available = await SupabaseService.client
+            .from('orders')
+            .select('*, restaurants(*), profiles(*)')
+            .eq('status', 'pending')
+            .isFilter('livreur_id', null)
+            .order('created_at', ascending: false);
+        
+        if (mounted) {
+          setState(() {
+            _acceptedOrders = List<Map<String, dynamic>>.from(accepted);
+            _availableOrders = List<Map<String, dynamic>>.from(available);
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       debugPrint('Erreur chargement commandes: $e');
