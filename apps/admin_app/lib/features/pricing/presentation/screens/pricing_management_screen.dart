@@ -91,7 +91,7 @@ class _PricingManagementScreenState extends ConsumerState<PricingManagementScree
         .from('pricing_config')
         .select('*')
         .order('name');
-    return List<Map<String, dynamic>>.from(response.data ?? []);
+    return List<Map<String, dynamic>>.from(response ?? []);
   }
 
   Future<List<Map<String, dynamic>>> _loadDeliveryZones() async {
@@ -99,7 +99,7 @@ class _PricingManagementScreenState extends ConsumerState<PricingManagementScree
         .from('delivery_zones')
         .select('*')
         .order('name');
-    return List<Map<String, dynamic>>.from(response.data ?? []);
+    return List<Map<String, dynamic>>.from(response ?? []);
   }
 
   Future<List<Map<String, dynamic>>> _loadPricingRules() async {
@@ -107,7 +107,7 @@ class _PricingManagementScreenState extends ConsumerState<PricingManagementScree
         .from('pricing_rules')
         .select('*')
         .order('priority');
-    return List<Map<String, dynamic>>.from(response.data ?? []);
+    return List<Map<String, dynamic>>.from(response ?? []);
   }
 
   @override
@@ -319,7 +319,7 @@ class _PricingManagementScreenState extends ConsumerState<PricingManagementScree
                 ),
                 Expanded(
                   child: LinearProgressIndicator(
-                    value: (entry.value as double - 1.0).clamp(0.0, 1.0),
+                    value: ((entry.value as double) - 1.0).clamp(0.0, 1.0),
                     backgroundColor: AppColors.surfaceVariant,
                     valueColor: AlwaysStoppedAnimation(AppColors.primary),
                   ),
@@ -471,7 +471,7 @@ class _PricingManagementScreenState extends ConsumerState<PricingManagementScree
         const SizedBox(height: 24),
         ElevatedButton.icon(
           onPressed: _addNewRule,
-          icon: const Icon(Icons.add_rule),
+          icon: const Icon(Icons.add),
           label: const Text('Ajouter Règle'),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
