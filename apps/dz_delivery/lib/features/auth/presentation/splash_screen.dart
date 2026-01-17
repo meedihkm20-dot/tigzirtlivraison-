@@ -45,7 +45,7 @@ class _SplashScreenState extends State<SplashScreen> {
         case 'restaurant':
           final isVerified = await SupabaseService.isRestaurantVerified();
           if (isVerified) {
-            Navigator.pushReplacementNamed(context, AppRouter.restaurantHome);
+            Navigator.pushReplacementNamed(context, AppRouter.restaurantMain);
           } else {
             Navigator.pushReplacementNamed(context, AppRouter.pendingApproval, arguments: 'restaurant');
           }

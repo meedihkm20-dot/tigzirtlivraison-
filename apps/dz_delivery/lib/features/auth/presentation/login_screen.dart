@@ -57,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
         case 'restaurant':
           final isVerified = await SupabaseService.isRestaurantVerified();
           if (isVerified) {
-            Navigator.pushReplacementNamed(context, AppRouter.restaurantHome);
+            Navigator.pushReplacementNamed(context, AppRouter.restaurantMain);
           } else {
             Navigator.pushReplacementNamed(context, AppRouter.pendingApproval, arguments: 'restaurant');
           }
