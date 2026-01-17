@@ -58,7 +58,7 @@ class _LivreurOrdersScreenState extends ConsumerState<LivreurOrdersScreen>
       final livreurState = ref.read(livreurProvider);
       
       // Charger commandes acceptées
-      final accepted = await SupabaseService.getLivreurAcceptedOrders();
+      final accepted = await SupabaseService.getAvailableOrders();
       
       // Charger commandes disponibles
       final available = await SupabaseService.getAvailableOrders();
@@ -291,7 +291,7 @@ class _LivreurOrdersScreenState extends ConsumerState<LivreurOrdersScreen>
                       style: AppTypography.bodySmall.copyWith(color: AppColors.textTertiary),
                     ),
                     Text(
-                      timeInfo['display'],
+                      timeInfo['display'] ?? '',
                       style: AppTypography.labelMedium.copyWith(
                         color: isUrgent ? AppColors.warning : AppColors.textPrimary,
                         fontWeight: FontWeight.bold,

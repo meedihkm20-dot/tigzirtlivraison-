@@ -98,10 +98,11 @@ class DeliveryChatService {
       
       final response = await _supabase
           .from('delivery_messages')
-          .select('id', const FetchOptions(count: CountOption.exact))
+          .select('id')
           .eq('order_id', orderId)
           .eq('sender_type', otherUserType)
-          .isFilter('read_at', null);
+          .isFilter('read_at', null)
+          .count();
       
       return response.count ?? 0;
     } catch (e) {

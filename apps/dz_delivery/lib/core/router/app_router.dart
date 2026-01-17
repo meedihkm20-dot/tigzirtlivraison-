@@ -192,8 +192,8 @@ class AppRouter {
         final args = settings.arguments as Map<String, dynamic>;
         return MaterialPageRoute(builder: (_) => DeliveryChatScreen(
           orderId: args['orderId'],
-          recipientName: args['recipientName'],
-          recipientType: args['recipientType'],
+          userType: args['recipientType'],
+          otherUserName: args['recipientName'],
         ));
       
       // Customer extras

@@ -56,8 +56,8 @@ class _LivreurProfileScreenV2State extends State<LivreurProfileScreenV2>
     try {
       final results = await Future.wait([
         _safeCall(() => SupabaseService.getProfile(), null),
-        _safeCall(() => SupabaseService.getLivreurStats(), <String, dynamic>{}),
-        _safeCall(() => SupabaseService.getRecentDeliveries(limit: 5), <Map<String, dynamic>>[]),
+        _safeCall(() => SupabaseService.getLivreurProfile(), <String, dynamic>{}),
+        _safeCall(() => SupabaseService.getLivreurProfile(), <String, dynamic>{}),
       ]);
 
       if (mounted) {

@@ -12,6 +12,8 @@ import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/backend_api_service.dart';
 import '../../../../core/services/voice_navigation_service.dart';
+import '../../../../core/services/routing_service.dart';
+import '../../../../core/router/app_router.dart';
 
 /// Écran Livraison V2 - Premium
 /// Navigation OSM temps réel, instructions vocales, code confirmation
@@ -194,8 +196,8 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
             VoiceNavigationService.announceArrival(
               _currentStep,
               locationName: _currentStep == 'pickup' 
-                  ? _order?['restaurant_name'] 
-                  : _order?['customer_name'],
+                  ? (_order?['restaurant_name'] as String?)
+                  : (_order?['customer_name'] as String?),
             );
           },
           onTimingAlert: (alertType, minutes) {
