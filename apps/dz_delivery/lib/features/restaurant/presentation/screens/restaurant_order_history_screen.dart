@@ -475,7 +475,7 @@ class _OrderHistoryCard extends StatelessWidget {
                   const Icon(Icons.delivery_dining, size: 16, color: AppColors.success),
                   const SizedBox(width: 4),
                   Text(
-                    order['livreur']?['full_name'] ?? 'Livreur',
+                    order['livreur']?['user']?['full_name'] ?? 'Livreur',
                     style: AppTypography.bodySmall.copyWith(color: AppColors.success),
                   ),
                 ],

@@ -1777,78 +1777,91 @@ class SupabaseService {
   // ============================================
 
   /// Récupérer les données financières du restaurant
+  /// Récupérer les données financières du restaurant
   static Future<Map<String, dynamic>> getRestaurantFinance(String period) async {
     final restaurant = await SupabaseService.getMyRestaurant();
     if (restaurant == null) return {};
     
-    DateTime startDate;
-    final now = DateTime.now();
-    
-    switch (period) {
-      case 'today':
-        startDate = DateTime(now.year, now.month, now.day);
-        break;
-      case 'week':
-        startDate = now.subtract(Duration(days: now.weekday - 1));
-        break;
-      case 'month':
-        startDate = DateTime(now.year, now.month, 1);
-        break;
-      default:
-        startDate = DateTime(now.year, now.month, now.day);
-    }
-    
-    // Récupérer les commandes de la période
-    final orders = await SupabaseService.client.from('orders')
-        .select('total, admin_commission, created_at')
-        .eq('restaurant_id', restaurant['id'])
-        .eq('status', 'delivered')
-        .gte('created_at', startDate.toIso8601String());
-    
-    double totalRevenue = 0;
-    double adminCommission = 0;
-    
-    for (final order in orders) {
-      totalRevenue += (order['total'] as num?)?.toDouble() ?? 0;
-      adminCommission += (order['admin_commission'] as num?)?.toDouble() ?? 0;
-    }
-    
-    final netEarnings = totalRevenue - adminCommission;
-    
-    // Données journalières pour le graphique
-    final dailyRevenue = <Map<String, dynamic>>[];
-    if (period == 'week') {
-      for (int i = 0; i < 7; i++) {
-        final day = startDate.add(Duration(days: i));
-        final nextDay = day.add(const Duration(days: 1));
-        
-        final dayOrders = await SupabaseService.client.from('orders')
-            .select('total')
-            .eq('restaurant_id', restaurant['id'])
-            .eq('status', 'delivered')
-            .gte('created_at', day.toIso8601String())
-            .lt('created_at', nextDay.toIso8601String());
-        
-        double dayRevenue = 0;
-        for (final order in dayOrders) {
-          dayRevenue += (order['total'] as num?)?.toDouble() ?? 0;
-        }
-        
-        dailyRevenue.add({
-          'day': ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'][i],
-          'revenue': dayRevenue,
-        });
+    try {
+      DateTime startDate;
+      final now = DateTime.now();
+      
+      switch (period) {
+        case 'today':
+          startDate = DateTime(now.year, now.month, now.day);
+          break;
+        case 'week':
+          startDate = now.subtract(Duration(days: now.weekday - 1));
+          break;
+        case 'month':
+          startDate = DateTime(now.year, now.month, 1);
+          break;
+        default:
+          startDate = DateTime(now.year, now.month, now.day);
       }
+      
+      // Récupérer les commandes de la période
+      final orders = await SupabaseService.client.from('orders')
+          .select('total, admin_commission, created_at')
+          .eq('restaurant_id', restaurant['id'])
+          .eq('status', 'delivered')
+          .gte('created_at', startDate.toIso8601String());
+      
+      double totalRevenue = 0;
+      double adminCommission = 0;
+      
+      for (final order in orders) {
+        totalRevenue += (order['total'] as num?)?.toDouble() ?? 0;
+        adminCommission += (order['admin_commission'] as num?)?.toDouble() ?? 0;
+      }
+      
+      final netEarnings = totalRevenue - adminCommission;
+      
+      // Données journalières pour le graphique
+      final dailyRevenue = <Map<String, dynamic>>[];
+      if (period == 'week') {
+        for (int i = 0; i < 7; i++) {
+          final day = startDate.add(Duration(days: i));
+          final nextDay = day.add(const Duration(days: 1));
+          
+          final dayOrders = await SupabaseService.client.from('orders')
+              .select('total')
+              .eq('restaurant_id', restaurant['id'])
+              .eq('status', 'delivered')
+              .gte('created_at', day.toIso8601String())
+              .lt('created_at', nextDay.toIso8601String());
+          
+          double dayRevenue = 0;
+          for (final order in dayOrders) {
+            dayRevenue += (order['total'] as num?)?.toDouble() ?? 0;
+          }
+          
+          dailyRevenue.add({
+            'day': ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'][i],
+            'revenue': dayRevenue,
+          });
+        }
+      }
+      
+      return {
+        'total_revenue': totalRevenue,
+        'admin_commission': adminCommission,
+        'net_earnings': netEarnings,
+        'order_count': orders.length,
+        'commission_rate': 10, // TODO: Récupérer depuis config
+        'daily_revenue': dailyRevenue,
+      };
+    } catch (e) {
+      debugPrint('Erreur getRestaurantFinance: $e');
+      return {
+        'total_revenue': 0.0,
+        'admin_commission': 0.0,
+        'net_earnings': 0.0,
+        'order_count': 0,
+        'commission_rate': 10,
+        'daily_revenue': [],
+      };
     }
-    
-    return {
-      'total_revenue': totalRevenue,
-      'admin_commission': adminCommission,
-      'net_earnings': netEarnings,
-      'order_count': orders.length,
-      'commission_rate': 10, // TODO: Récupérer depuis config
-      'daily_revenue': dailyRevenue,
-    };
   }
 
   /// Récupérer les transactions du restaurant
@@ -1856,30 +1869,36 @@ class SupabaseService {
     final restaurant = await SupabaseService.getMyRestaurant();
     if (restaurant == null) return [];
     
-    DateTime startDate;
-    final now = DateTime.now();
-    
-    switch (period) {
-      case 'today':
-        startDate = DateTime(now.year, now.month, now.day);
-        break;
-      case 'week':
-        startDate = now.subtract(Duration(days: now.weekday - 1));
-        break;
-      case 'month':
-        startDate = DateTime(now.year, now.month, 1);
-        break;
-      default:
-        startDate = DateTime(now.year, now.month, now.day);
+    try {
+      DateTime startDate;
+      final now = DateTime.now();
+      
+      switch (period) {
+        case 'today':
+          startDate = DateTime(now.year, now.month, now.day);
+          break;
+        case 'week':
+          startDate = now.subtract(Duration(days: now.weekday - 1));
+          break;
+        case 'month':
+          startDate = DateTime(now.year, now.month, 1);
+          break;
+        default:
+          startDate = DateTime(now.year, now.month, now.day);
+      }
+      
+      final response = await SupabaseService.client.from('transactions')
+          .select('*')
+          .eq('restaurant_id', restaurant['id'])
+          .gte('created_at', startDate.toIso8601String())
+          .order('created_at', ascending: false);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Erreur getRestaurantTransactions: $e');
+      // Si la table transactions n'existe pas, retourner liste vide
+      return [];
     }
-    
-    final response = await SupabaseService.client.from('transactions')
-        .select('*, order:orders(order_number)')
-        .eq('restaurant_id', restaurant['id'])
-        .gte('created_at', startDate.toIso8601String())
-        .order('created_at', ascending: false);
-    
-    return List<Map<String, dynamic>>.from(response);
   }
 
   /// Récupérer toutes les commandes du restaurant
@@ -1887,18 +1906,23 @@ class SupabaseService {
     final restaurant = await SupabaseService.getMyRestaurant();
     if (restaurant == null) return [];
     
-    final response = await SupabaseService.client.from('orders')
-        .select('''
-          *,
-          customer:profiles!orders_customer_id_fkey(full_name, phone),
-          livreur:profiles!orders_livreur_id_fkey(full_name, phone),
-          order_items(*)
-        ''')
-        .eq('restaurant_id', restaurant['id'])
-        .order('created_at', ascending: false)
-        .limit(100);
-    
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      final response = await SupabaseService.client.from('orders')
+          .select('''
+            *,
+            customer:profiles!orders_customer_id_fkey(full_name, phone),
+            livreur:livreurs!orders_livreur_id_fkey(user:profiles(full_name, phone)),
+            order_items(*)
+          ''')
+          .eq('restaurant_id', restaurant['id'])
+          .order('created_at', ascending: false)
+          .limit(100);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Erreur getRestaurantAllOrders: $e');
+      return [];
+    }
   }
 
   /// Récupérer l'historique des commandes (livrées, annulées)
@@ -1906,18 +1930,23 @@ class SupabaseService {
     final restaurant = await SupabaseService.getMyRestaurant();
     if (restaurant == null) return [];
     
-    final response = await SupabaseService.client.from('orders')
-        .select('''
-          *,
-          customer:profiles!orders_customer_id_fkey(full_name, phone),
-          livreur:profiles!orders_livreur_id_fkey(full_name, phone),
-          order_items(*)
-        ''')
-        .eq('restaurant_id', restaurant['id'])
-        .inFilter('status', ['delivered', 'cancelled'])
-        .order('created_at', ascending: false)
-        .limit(100);
-    
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      final response = await SupabaseService.client.from('orders')
+          .select('''
+            *,
+            customer:profiles!orders_customer_id_fkey(full_name, phone),
+            livreur:livreurs!orders_livreur_id_fkey(user:profiles(full_name, phone)),
+            order_items(*)
+          ''')
+          .eq('restaurant_id', restaurant['id'])
+          .inFilter('status', ['delivered', 'cancelled'])
+          .order('created_at', ascending: false)
+          .limit(100);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Erreur getRestaurantOrderHistory: $e');
+      return [];
+    }
   }
 }
