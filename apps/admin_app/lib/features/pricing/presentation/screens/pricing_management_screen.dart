@@ -563,51 +563,377 @@ class _PricingManagementScreenState extends ConsumerState<PricingManagementScree
 
   // Actions
   void _addNewConfig() {
-    // TODO: Implémenter l'ajout de configuration
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Fonctionnalité en développement')),
-    );
+    _showConfigDialog(null);
   }
 
   void _editConfig(Map<String, dynamic> config) {
-    // TODO: Implémenter l'édition de configuration
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Édition de ${config['name']}')),
+    _showConfigDialog(config);
+  }
+
+  Future<void> _showConfigDialog(Map<String, dynamic>? config) async {
+    final nameController = TextEditingController(text: config?['name'] ?? '');
+    final descController = TextEditingController(text: config?['description'] ?? '');
+    final valueController = TextEditingController(text: config?['value']?.toString() ?? '');
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text(
+          config == null ? 'Nouvelle Configuration' : 'Modifier Configuration',
+          style: AppTypography.titleMedium,
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Nom'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descController,
+                decoration: const InputDecoration(labelText: 'Description'),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: valueController,
+                decoration: const InputDecoration(labelText: 'Valeur (DA)'),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty || valueController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Tous les champs sont requis')),
+                );
+                return;
+              }
+
+              try {
+                final data = {
+                  'name': nameController.text,
+                  'description': descController.text,
+                  'value': double.parse(valueController.text),
+                  'updated_at': DateTime.now().toIso8601String(),
+                };
+
+                if (config == null) {
+                  await SupabaseService.client.from('pricing_config').insert(data);
+                } else {
+                  await SupabaseService.client
+                      .from('pricing_config')
+                      .update(data)
+                      .eq('id', config['id']);
+                }
+
+                Navigator.pop(ctx, true);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Erreur: $e')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
     );
+
+    if (result == true) {
+      _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Configuration enregistrée'), backgroundColor: AppColors.success),
+        );
+      }
+    }
   }
 
   void _addNewZone() {
-    // TODO: Implémenter l'ajout de zone
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Fonctionnalité en développement')),
-    );
+    _showZoneDialog(null);
   }
 
   void _editZone(Map<String, dynamic> zone) {
-    // TODO: Implémenter l'édition de zone
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Édition de ${zone['name']}')),
+    _showZoneDialog(zone);
+  }
+
+  Future<void> _showZoneDialog(Map<String, dynamic>? zone) async {
+    final nameController = TextEditingController(text: zone?['name'] ?? '');
+    final descController = TextEditingController(text: zone?['description'] ?? '');
+    final multiplierController = TextEditingController(text: zone?['multiplier']?.toString() ?? '1.0');
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text(
+          zone == null ? 'Nouvelle Zone' : 'Modifier Zone',
+          style: AppTypography.titleMedium,
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Nom de la zone'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descController,
+                decoration: const InputDecoration(labelText: 'Description'),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: multiplierController,
+                decoration: const InputDecoration(
+                  labelText: 'Multiplicateur',
+                  helperText: '1.0 = standard, 1.5 = +50%',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty || multiplierController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Tous les champs sont requis')),
+                );
+                return;
+              }
+
+              try {
+                final data = {
+                  'name': nameController.text,
+                  'description': descController.text,
+                  'multiplier': double.parse(multiplierController.text),
+                  'updated_at': DateTime.now().toIso8601String(),
+                };
+
+                if (zone == null) {
+                  await SupabaseService.client.from('delivery_zones').insert(data);
+                } else {
+                  await SupabaseService.client
+                      .from('delivery_zones')
+                      .update(data)
+                      .eq('id', zone['id']);
+                }
+
+                Navigator.pop(ctx, true);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Erreur: $e')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
     );
+
+    if (result == true) {
+      _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Zone enregistrée'), backgroundColor: AppColors.success),
+        );
+      }
+    }
   }
 
   void _addNewRule() {
-    // TODO: Implémenter l'ajout de règle
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Fonctionnalité en développement')),
-    );
+    _showRuleDialog(null);
   }
 
   void _editRule(Map<String, dynamic> rule) {
-    // TODO: Implémenter l'édition de règle
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Édition de ${rule['name']}')),
-    );
+    _showRuleDialog(rule);
   }
 
-  void _toggleRule(Map<String, dynamic> rule) {
-    // TODO: Implémenter l'activation/désactivation de règle
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Règle ${rule['name']} ${rule['is_active'] ? 'désactivée' : 'activée'}')),
+  Future<void> _showRuleDialog(Map<String, dynamic>? rule) async {
+    final nameController = TextEditingController(text: rule?['name'] ?? '');
+    final ruleTypeController = TextEditingController(text: rule?['rule_type'] ?? 'time');
+    final conditionKeyController = TextEditingController(text: rule?['condition_key'] ?? '');
+    final conditionOperatorController = TextEditingController(text: rule?['condition_operator'] ?? '>=');
+    final conditionValueController = TextEditingController(text: rule?['condition_value'] ?? '');
+    final multiplierController = TextEditingController(text: rule?['multiplier']?.toString() ?? '1.0');
+    final priorityController = TextEditingController(text: rule?['priority']?.toString() ?? '1');
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text(
+          rule == null ? 'Nouvelle Règle' : 'Modifier Règle',
+          style: AppTypography.titleMedium,
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Nom de la règle'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: ruleTypeController.text,
+                decoration: const InputDecoration(labelText: 'Type'),
+                items: const [
+                  DropdownMenuItem(value: 'time', child: Text('Heure')),
+                  DropdownMenuItem(value: 'weather', child: Text('Météo')),
+                  DropdownMenuItem(value: 'demand', child: Text('Demande')),
+                  DropdownMenuItem(value: 'zone', child: Text('Zone')),
+                ],
+                onChanged: (value) => ruleTypeController.text = value ?? 'time',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: conditionKeyController,
+                decoration: const InputDecoration(
+                  labelText: 'Clé condition',
+                  helperText: 'Ex: hour, weather_condition, demand_level',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: conditionOperatorController,
+                decoration: const InputDecoration(labelText: 'Opérateur (>=, <=, ==)'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: conditionValueController,
+                decoration: const InputDecoration(labelText: 'Valeur condition'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: multiplierController,
+                decoration: const InputDecoration(labelText: 'Multiplicateur'),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: priorityController,
+                decoration: const InputDecoration(labelText: 'Priorité (1-10)'),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Le nom est requis')),
+                );
+                return;
+              }
+
+              try {
+                final data = {
+                  'name': nameController.text,
+                  'rule_type': ruleTypeController.text,
+                  'condition_key': conditionKeyController.text,
+                  'condition_operator': conditionOperatorController.text,
+                  'condition_value': conditionValueController.text,
+                  'multiplier': double.parse(multiplierController.text),
+                  'priority': int.parse(priorityController.text),
+                  'is_active': true,
+                  'updated_at': DateTime.now().toIso8601String(),
+                };
+
+                if (rule == null) {
+                  await SupabaseService.client.from('pricing_rules').insert(data);
+                } else {
+                  await SupabaseService.client
+                      .from('pricing_rules')
+                      .update(data)
+                      .eq('id', rule['id']);
+                }
+
+                Navigator.pop(ctx, true);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Erreur: $e')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
     );
+
+    if (result == true) {
+      _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Règle enregistrée'), backgroundColor: AppColors.success),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleRule(Map<String, dynamic> rule) async {
+    try {
+      final newStatus = !(rule['is_active'] ?? false);
+      await SupabaseService.client
+          .from('pricing_rules')
+          .update({
+            'is_active': newStatus,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', rule['id']);
+
+      _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Règle ${newStatus ? 'activée' : 'désactivée'}'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur: $e'), backgroundColor: AppColors.error),
+      );
+    }
   }
 }

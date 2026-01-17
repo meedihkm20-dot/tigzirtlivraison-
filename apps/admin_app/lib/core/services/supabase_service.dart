@@ -231,7 +231,7 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> getAllRestaurants() async {
     final response = await client
         .from('restaurants')
-        .select('*, owner:profiles!owner_id(full_name, phone)')
+        .select('*, owner:profiles!restaurants_owner_id_fkey(full_name, phone)')
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response);
   }
@@ -239,7 +239,7 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> getPendingRestaurants() async {
     final response = await client
         .from('restaurants')
-        .select('*, owner:profiles!owner_id(full_name, phone)')
+        .select('*, owner:profiles!restaurants_owner_id_fkey(full_name, phone)')
         .eq('is_verified', false)
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response);
@@ -388,9 +388,9 @@ class SupabaseService {
   }) async {
     var query = client.from('orders').select('''
       *,
-      customer:profiles!customer_id(full_name, phone),
-      restaurant:restaurants!restaurant_id(name, phone),
-      livreur:livreurs!livreur_id(user:profiles!user_id(full_name, phone))
+      customer:profiles!orders_customer_id_fkey(full_name, phone),
+      restaurant:restaurants!orders_restaurant_id_fkey(name, phone),
+      livreur:livreurs!orders_livreur_id_fkey(*, user:profiles(full_name, phone))
     ''');
 
     if (status != null && status.isNotEmpty) {
@@ -419,9 +419,9 @@ class SupabaseService {
   static Future<Map<String, dynamic>?> getOrderDetails(String orderId) async {
     final response = await client.from('orders').select('''
       *,
-      customer:profiles!customer_id(full_name, phone, email:id),
-      restaurant:restaurants!restaurant_id(name, phone, address),
-      livreur:livreurs!livreur_id(*, user:profiles!user_id(full_name, phone)),
+      customer:profiles!orders_customer_id_fkey(full_name, phone, email:id),
+      restaurant:restaurants!orders_restaurant_id_fkey(name, phone, address),
+      livreur:livreurs!orders_livreur_id_fkey(*, user:profiles(full_name, phone)),
       order_items(*)
     ''').eq('id', orderId).single();
     return response;
@@ -636,12 +636,14 @@ class SupabaseService {
 
     double totalRevenue = 0, totalAdminCommission = 0, totalLivreurCommission = 0;
     double totalRestaurantAmount = 0, monthRevenue = 0, monthCommission = 0;
+    double totalDeliveryFees = 0, totalServiceFees = 0;
 
     for (var order in deliveredOrders) {
       totalRevenue += (order['total'] ?? 0).toDouble();
       totalAdminCommission += (order['admin_commission'] ?? 0).toDouble();
       totalLivreurCommission += (order['livreur_commission'] ?? 0).toDouble();
       totalRestaurantAmount += (order['restaurant_amount'] ?? 0).toDouble();
+      totalDeliveryFees += (order['delivery_fee'] ?? 0).toDouble();
 
       final createdAt = DateTime.parse(order['created_at']);
       if (createdAt.isAfter(startOfMonth)) {
@@ -653,9 +655,12 @@ class SupabaseService {
     return {
       'total_orders': deliveredOrders.length,
       'total_revenue': totalRevenue,
+      'total_commission': totalAdminCommission,
       'total_admin_commission': totalAdminCommission,
       'total_livreur_commission': totalLivreurCommission,
       'total_restaurant_amount': totalRestaurantAmount,
+      'total_delivery_fees': totalDeliveryFees,
+      'total_service_fees': totalServiceFees,
       'month_revenue': monthRevenue,
       'month_commission': monthCommission,
     };
