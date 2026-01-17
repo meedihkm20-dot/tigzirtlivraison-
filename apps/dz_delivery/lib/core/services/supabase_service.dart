@@ -1771,7 +1771,6 @@ class SupabaseService {
         .from('avatars')
         .remove([fileName]);
   }
-}
 
   // ============================================
   // RESTAURANT - FINANCE & HISTORIQUE
@@ -1779,7 +1778,7 @@ class SupabaseService {
 
   /// Récupérer les données financières du restaurant
   static Future<Map<String, dynamic>> getRestaurantFinance(String period) async {
-    final restaurant = await getMyRestaurant();
+    final restaurant = await SupabaseService.getMyRestaurant();
     if (restaurant == null) return {};
     
     DateTime startDate;
@@ -1800,7 +1799,7 @@ class SupabaseService {
     }
     
     // Récupérer les commandes de la période
-    final orders = await client.from('orders')
+    final orders = await SupabaseService.client.from('orders')
         .select('total, admin_commission, created_at')
         .eq('restaurant_id', restaurant['id'])
         .eq('status', 'delivered')
@@ -1823,7 +1822,7 @@ class SupabaseService {
         final day = startDate.add(Duration(days: i));
         final nextDay = day.add(const Duration(days: 1));
         
-        final dayOrders = await client.from('orders')
+        final dayOrders = await SupabaseService.client.from('orders')
             .select('total')
             .eq('restaurant_id', restaurant['id'])
             .eq('status', 'delivered')
@@ -1854,7 +1853,7 @@ class SupabaseService {
 
   /// Récupérer les transactions du restaurant
   static Future<List<Map<String, dynamic>>> getRestaurantTransactions(String period) async {
-    final restaurant = await getMyRestaurant();
+    final restaurant = await SupabaseService.getMyRestaurant();
     if (restaurant == null) return [];
     
     DateTime startDate;
@@ -1874,7 +1873,7 @@ class SupabaseService {
         startDate = DateTime(now.year, now.month, now.day);
     }
     
-    final response = await client.from('transactions')
+    final response = await SupabaseService.client.from('transactions')
         .select('*, order:orders(order_number)')
         .eq('restaurant_id', restaurant['id'])
         .gte('created_at', startDate.toIso8601String())
@@ -1885,10 +1884,10 @@ class SupabaseService {
 
   /// Récupérer toutes les commandes du restaurant
   static Future<List<Map<String, dynamic>>> getRestaurantAllOrders() async {
-    final restaurant = await getMyRestaurant();
+    final restaurant = await SupabaseService.getMyRestaurant();
     if (restaurant == null) return [];
     
-    final response = await client.from('orders')
+    final response = await SupabaseService.client.from('orders')
         .select('''
           *,
           customer:profiles!orders_customer_id_fkey(full_name, phone),
@@ -1904,10 +1903,10 @@ class SupabaseService {
 
   /// Récupérer l'historique des commandes (livrées, annulées)
   static Future<List<Map<String, dynamic>>> getRestaurantOrderHistory() async {
-    final restaurant = await getMyRestaurant();
+    final restaurant = await SupabaseService.getMyRestaurant();
     if (restaurant == null) return [];
     
-    final response = await client.from('orders')
+    final response = await SupabaseService.client.from('orders')
         .select('''
           *,
           customer:profiles!orders_customer_id_fkey(full_name, phone),
@@ -1921,3 +1920,4 @@ class SupabaseService {
     
     return List<Map<String, dynamic>>.from(response);
   }
+}
