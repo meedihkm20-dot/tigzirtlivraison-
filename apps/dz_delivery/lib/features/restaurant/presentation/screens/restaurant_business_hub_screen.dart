@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../core/design_system/theme/app_colors.dart';
-import '../../../core/design_system/theme/app_typography.dart';
+import '../../../../core/design_system/theme/app_colors.dart';
+import '../../../../core/design_system/theme/app_typography.dart';
 import 'restaurant_finance_screen.dart';
 import 'restaurant_livreur_management_screen.dart';
 import 'stats_screen_v2.dart';

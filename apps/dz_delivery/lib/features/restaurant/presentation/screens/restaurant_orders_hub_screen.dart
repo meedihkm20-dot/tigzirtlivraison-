@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../core/design_system/theme/app_colors.dart';
-import '../../../core/design_system/theme/app_typography.dart';
+import '../../../../core/design_system/theme/app_colors.dart';
+import '../../../../core/design_system/theme/app_typography.dart';
 import 'restaurant_orders_screen.dart';
 import 'kitchen_screen_v2.dart';
 import 'restaurant_order_history_screen.dart';
