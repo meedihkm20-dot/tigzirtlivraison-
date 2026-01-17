@@ -133,6 +133,26 @@ class _RestaurantHomeScreenV3State extends ConsumerState<RestaurantHomeScreenV3>
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ActionButton(
+                            label: 'Profil',
+                            icon: Icons.person,
+                            onTap: () => Navigator.pushNamed(context, AppRouter.restaurantProfileV2),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _ActionButton(
+                            label: 'Livreurs',
+                            icon: Icons.delivery_dining,
+                            onTap: () => Navigator.pushNamed(context, AppRouter.restaurantLivreurManagement),
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 24),
                     
                     // Commandes en attente

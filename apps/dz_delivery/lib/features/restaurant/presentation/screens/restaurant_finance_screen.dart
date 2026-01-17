@@ -544,8 +544,12 @@ class _TransactionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final amount = (transaction['amount'] ?? 0).toDouble();
+    final total = (transaction['total'] ?? 0).toDouble();
+    final commission = (transaction['commission'] ?? 0).toDouble();
     final type = transaction['type'] as String?;
     final createdAt = transaction['created_at'] as String?;
+    final orderNumber = transaction['order_number'] as String?;
+    final customerName = transaction['customer_name'] as String?;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -554,51 +558,67 @@ class _TransactionCard extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.success.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(Icons.attach_money, color: AppColors.success),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _getTypeLabel(type),
-                  style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                if (createdAt != null)
+                child: Icon(Icons.receipt_long, color: AppColors.success),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Commande #${orderNumber ?? ''}',
+                      style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    if (customerName != null)
+                      Text(
+                        customerName,
+                        style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
+                      ),
+                    if (createdAt != null)
+                      Text(
+                        _formatDate(createdAt),
+                        style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
+                      ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
                   Text(
-                    _formatDate(createdAt),
+                    '${amount.toStringAsFixed(0)} DA',
+                    style: AppTypography.titleSmall.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.success,
+                    ),
+                  ),
+                  Text(
+                    'Total: ${total.toStringAsFixed(0)} DA',
                     style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
                   ),
-              ],
-            ),
-          ),
-          Text(
-            '${amount.toStringAsFixed(0)} DA',
-            style: AppTypography.titleSmall.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppColors.success,
-            ),
+                  if (commission > 0)
+                    Text(
+                      'Commission: ${commission.toStringAsFixed(0)} DA',
+                      style: AppTypography.bodySmall.copyWith(color: AppColors.warning),
+                    ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
     );
-  }
-
-  String _getTypeLabel(String? type) {
-    switch (type) {
-      case 'restaurant_payment': return 'Paiement restaurant';
-      case 'commission': return 'Commission';
-      default: return type ?? 'Transaction';
-    }
   }
 
   String _formatDate(String dateStr) {

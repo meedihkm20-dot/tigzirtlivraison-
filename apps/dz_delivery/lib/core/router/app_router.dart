@@ -28,6 +28,8 @@ import '../../features/restaurant/presentation/screens/restaurant_home_screen_v3
 import '../../features/restaurant/presentation/screens/restaurant_orders_screen.dart';
 import '../../features/restaurant/presentation/screens/restaurant_finance_screen.dart';
 import '../../features/restaurant/presentation/screens/restaurant_order_history_screen.dart';
+import '../../features/restaurant/presentation/screens/restaurant_profile_screen_v2.dart';
+import '../../features/restaurant/presentation/screens/restaurant_livreur_management_screen.dart';
 import '../../features/restaurant/presentation/screens/kitchen_screen_v2.dart';
 import '../../features/restaurant/presentation/screens/stats_screen_v2.dart';
 import '../../features/restaurant/presentation/screens/stock_management_screen.dart';
@@ -75,6 +77,8 @@ class AppRouter {
   static const String restaurantOrders = '/restaurant/orders';
   static const String restaurantFinance = '/restaurant/finance';
   static const String restaurantOrderHistory = '/restaurant/order-history';
+  static const String restaurantProfileV2 = '/restaurant/profile-v2';
+  static const String restaurantLivreurManagement = '/restaurant/livreur-management';
   static const String menu = '/restaurant/menu';
   static const String restaurantOrderDetail = '/restaurant/order';
   static const String stats = '/restaurant/stats';
@@ -158,6 +162,10 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const RestaurantFinanceScreen());
       case restaurantOrderHistory:
         return MaterialPageRoute(builder: (_) => const RestaurantOrderHistoryScreen());
+      case restaurantProfileV2:
+        return MaterialPageRoute(builder: (_) => const RestaurantProfileScreenV2());
+      case restaurantLivreurManagement:
+        return MaterialPageRoute(builder: (_) => const RestaurantLivreurManagementScreen());
       case menu:
         return MaterialPageRoute(builder: (_) => const MenuScreen());
       case restaurantOrderDetail:

@@ -386,34 +386,42 @@ class SupabaseService {
     String? status,
     String? search,
   }) async {
-    var query = client.from('orders').select('''
-      *,
-      customer:profiles!orders_customer_id_fkey(full_name, phone),
-      restaurant:restaurants!orders_restaurant_id_fkey(name, phone),
-      livreur:livreurs!orders_livreur_id_fkey(*, user:profiles(full_name, phone))
-    ''');
+    try {
+      var query = client.from('orders').select('''
+        *,
+        customer:profiles!orders_customer_id_fkey(full_name, phone),
+        restaurant:restaurants!orders_restaurant_id_fkey(name, phone),
+        livreur:livreurs!orders_livreur_id_fkey(*, user:profiles(full_name, phone))
+      ''');
 
-    if (status != null && status.isNotEmpty) {
-      query = query.eq('status', status);
+      if (status != null && status.isNotEmpty) {
+        query = query.eq('status', status);
+      }
+
+      final response = await query.order('created_at', ascending: false).limit(limit);
+      var orders = List<Map<String, dynamic>>.from(response);
+
+      print('✅ Admin getAllOrders: ${orders.length} commandes récupérées');
+
+      // Filtrer par recherche côté client si nécessaire
+      if (search != null && search.isNotEmpty) {
+        final searchLower = search.toLowerCase();
+        orders = orders.where((o) {
+          final orderNumber = (o['order_number'] ?? '').toString().toLowerCase();
+          final customerName = (o['customer']?['full_name'] ?? '').toString().toLowerCase();
+          final customerPhone = (o['customer']?['phone'] ?? '').toString().toLowerCase();
+          return orderNumber.contains(searchLower) ||
+                 customerName.contains(searchLower) ||
+                 customerPhone.contains(searchLower);
+        }).toList();
+      }
+
+      return orders;
+    } catch (e) {
+      print('❌ Erreur getAllOrders: $e');
+      // Retourner liste vide au lieu de throw pour éviter crash
+      return [];
     }
-
-    final response = await query.order('created_at', ascending: false).limit(limit);
-    var orders = List<Map<String, dynamic>>.from(response);
-
-    // Filtrer par recherche côté client si nécessaire
-    if (search != null && search.isNotEmpty) {
-      final searchLower = search.toLowerCase();
-      orders = orders.where((o) {
-        final orderNumber = (o['order_number'] ?? '').toString().toLowerCase();
-        final customerName = (o['customer']?['full_name'] ?? '').toString().toLowerCase();
-        final customerPhone = (o['customer']?['phone'] ?? '').toString().toLowerCase();
-        return orderNumber.contains(searchLower) ||
-               customerName.contains(searchLower) ||
-               customerPhone.contains(searchLower);
-      }).toList();
-    }
-
-    return orders;
   }
 
   static Future<Map<String, dynamic>?> getOrderDetails(String orderId) async {
@@ -842,6 +850,237 @@ class SupabaseService {
       'body': body,
       'notification_type': 'admin_alert',
     });
+  }
+
+  // ============================================
+  // SYSTEM SETTINGS
+  // ============================================
+
+  /// Récupérer les paramètres système
+  static Future<Map<String, dynamic>?> getSystemSettings() async {
+    try {
+      final response = await client
+          .from('system_settings')
+          .select()
+          .limit(1)
+          .maybeSingle();
+      
+      if (response == null) {
+        // Retourner valeurs par défaut si pas de settings
+        return {
+          'commission_rate': 10.0,
+          'service_fee': 50.0,
+          'min_order_amount': 500.0,
+          'base_delivery_fee': 150.0,
+          'per_km_fee': 30.0,
+          'max_delivery_distance': 10.0,
+          'max_active_orders': 5,
+          'max_daily_orders': 100,
+        };
+      }
+      
+      return response;
+    } catch (e) {
+      print('❌ Erreur getSystemSettings: $e');
+      // Retourner valeurs par défaut en cas d'erreur
+      return {
+        'commission_rate': 10.0,
+        'service_fee': 50.0,
+        'min_order_amount': 500.0,
+        'base_delivery_fee': 150.0,
+        'per_km_fee': 30.0,
+        'max_delivery_distance': 10.0,
+        'max_active_orders': 5,
+        'max_daily_orders': 100,
+      };
+    }
+  }
+
+  /// Mettre à jour les paramètres système
+  static Future<void> updateSystemSettings(Map<String, dynamic> settings) async {
+    try {
+      // Vérifier si des settings existent
+      final existing = await client
+          .from('system_settings')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
+      
+      if (existing != null) {
+        // Update
+        await client
+            .from('system_settings')
+            .update({
+              ...settings,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', existing['id']);
+      } else {
+        // Insert
+        await client.from('system_settings').insert({
+          ...settings,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      }
+
+      await logAction(
+        action: 'update_system_settings',
+        entityType: 'system_settings',
+        newValue: settings,
+        reason: 'Mise à jour des paramètres système',
+      );
+      
+      print('✅ Paramètres système mis à jour');
+    } catch (e) {
+      print('❌ Erreur updateSystemSettings: $e');
+      rethrow;
+    }
+  }
+
+  // ============================================
+  // LIVREURS MANAGEMENT
+  // ============================================
+
+  /// Récupérer tous les livreurs avec stats
+  static Future<List<Map<String, dynamic>>> getAllLivreurs() async {
+    try {
+      final response = await client
+          .from('livreurs')
+          .select('*, user:profiles!user_id(full_name, phone, email:id)')
+          .order('created_at', ascending: false);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('❌ Erreur getAllLivreurs: $e');
+      return [];
+    }
+  }
+
+  /// Activer/Désactiver un livreur
+  static Future<void> toggleLivreurStatus(String livreurId, bool isActive) async {
+    await client.from('livreurs').update({
+      'is_verified': isActive,
+      'is_available': isActive ? false : false,
+      'is_online': isActive ? false : false,
+    }).eq('id', livreurId);
+
+    await logAction(
+      action: isActive ? 'activate_livreur' : 'deactivate_livreur',
+      entityType: 'livreur',
+      entityId: livreurId,
+      reason: isActive ? 'Livreur activé' : 'Livreur désactivé',
+    );
+  }
+
+  /// Récupérer les stats détaillées d'un livreur
+  static Future<Map<String, dynamic>> getLivreurStats(String livreurId) async {
+    try {
+      // Stats de base
+      final livreur = await client
+          .from('livreurs')
+          .select('*, user:profiles!user_id(full_name, phone)')
+          .eq('id', livreurId)
+          .single();
+
+      // Commandes livrées
+      final deliveredOrders = await client
+          .from('orders')
+          .select('id, total, livreur_commission, delivered_at')
+          .eq('livreur_id', livreurId)
+          .eq('status', 'delivered');
+
+      double totalEarnings = 0;
+      for (final order in deliveredOrders) {
+        totalEarnings += (order['livreur_commission'] as num?)?.toDouble() ?? 0;
+      }
+
+      return {
+        ...livreur,
+        'total_deliveries': deliveredOrders.length,
+        'total_earnings': totalEarnings,
+        'deliveries': deliveredOrders,
+      };
+    } catch (e) {
+      print('❌ Erreur getLivreurStats: $e');
+      return {};
+    }
+  }
+
+  // ============================================
+  // RESTAURANTS MANAGEMENT
+  // ============================================
+
+  /// Récupérer tous les restaurants avec stats
+  static Future<List<Map<String, dynamic>>> getAllRestaurants() async {
+    try {
+      final response = await client
+          .from('restaurants')
+          .select('*, owner:profiles!owner_id(full_name, phone)')
+          .order('created_at', ascending: false);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('❌ Erreur getAllRestaurants: $e');
+      return [];
+    }
+  }
+
+  /// Activer/Désactiver un restaurant
+  static Future<void> toggleRestaurantStatus(String restaurantId, bool isActive) async {
+    await client.from('restaurants').update({
+      'is_verified': isActive,
+      'is_open': isActive ? false : false,
+    }).eq('id', restaurantId);
+
+    await logAction(
+      action: isActive ? 'activate_restaurant' : 'deactivate_restaurant',
+      entityType: 'restaurant',
+      entityId: restaurantId,
+      reason: isActive ? 'Restaurant activé' : 'Restaurant désactivé',
+    );
+  }
+
+  /// Récupérer les stats détaillées d'un restaurant
+  static Future<Map<String, dynamic>> getRestaurantStats(String restaurantId) async {
+    try {
+      // Stats de base
+      final restaurant = await client
+          .from('restaurants')
+          .select('*, owner:profiles!owner_id(full_name, phone)')
+          .eq('id', restaurantId)
+          .single();
+
+      // Commandes
+      final orders = await client
+          .from('orders')
+          .select('id, total, admin_commission, status, created_at')
+          .eq('restaurant_id', restaurantId);
+
+      double totalRevenue = 0;
+      double totalCommission = 0;
+      int deliveredCount = 0;
+
+      for (final order in orders) {
+        if (order['status'] == 'delivered') {
+          totalRevenue += (order['total'] as num?)?.toDouble() ?? 0;
+          totalCommission += (order['admin_commission'] as num?)?.toDouble() ?? 0;
+          deliveredCount++;
+        }
+      }
+
+      return {
+        ...restaurant,
+        'total_orders': orders.length,
+        'delivered_orders': deliveredCount,
+        'total_revenue': totalRevenue,
+        'total_commission': totalCommission,
+        'net_revenue': totalRevenue - totalCommission,
+      };
+    } catch (e) {
+      print('❌ Erreur getRestaurantStats: $e');
+      return {};
+    }
   }
 
   // ============================================

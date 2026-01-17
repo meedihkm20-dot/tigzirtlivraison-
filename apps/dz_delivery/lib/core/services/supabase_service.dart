@@ -455,14 +455,40 @@ class SupabaseService {
   }
 
   static Future<void> startPreparing(String orderId) async {
-    await client.from('orders').update({'status': 'preparing'}).eq('id', orderId);
+    try {
+      final result = await client.from('orders').update({
+        'status': 'preparing',
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', orderId).select();
+      
+      if (result.isEmpty) {
+        throw Exception('Impossible de mettre à jour la commande');
+      }
+      
+      debugPrint('✅ Commande $orderId passée en préparation');
+    } catch (e) {
+      debugPrint('❌ Erreur startPreparing: $e');
+      rethrow;
+    }
   }
 
   static Future<void> markAsReady(String orderId) async {
-    await client.from('orders').update({
-      'status': 'ready',
-      'prepared_at': DateTime.now().toIso8601String(),
-    }).eq('id', orderId);
+    try {
+      final result = await client.from('orders').update({
+        'status': 'ready',
+        'prepared_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', orderId).select();
+      
+      if (result.isEmpty) {
+        throw Exception('Impossible de mettre à jour la commande');
+      }
+      
+      debugPrint('✅ Commande $orderId marquée comme prête');
+    } catch (e) {
+      debugPrint('❌ Erreur markAsReady: $e');
+      rethrow;
+    }
   }
 
   /// Annule une commande
@@ -1876,7 +1902,7 @@ class SupabaseService {
     }
   }
 
-  /// Récupérer les transactions du restaurant
+  /// Récupérer les transactions du restaurant (basées sur les commandes livrées)
   static Future<List<Map<String, dynamic>>> getRestaurantTransactions(String period) async {
     final restaurant = await SupabaseService.getMyRestaurant();
     if (restaurant == null) return [];
@@ -1899,16 +1925,33 @@ class SupabaseService {
           startDate = DateTime(now.year, now.month, now.day);
       }
       
-      final response = await SupabaseService.client.from('transactions')
-          .select('*')
+      // Récupérer les commandes livrées comme transactions
+      final response = await SupabaseService.client.from('orders')
+          .select('id, order_number, total, admin_commission, delivered_at, created_at, customer:profiles!orders_customer_id_fkey(full_name)')
           .eq('restaurant_id', restaurant['id'])
-          .gte('created_at', startDate.toIso8601String())
-          .order('created_at', ascending: false);
+          .eq('status', 'delivered')
+          .gte('delivered_at', startDate.toIso8601String())
+          .order('delivered_at', ascending: false);
       
-      return List<Map<String, dynamic>>.from(response);
+      // Transformer en format transaction
+      return List<Map<String, dynamic>>.from(response).map((order) {
+        final total = (order['total'] as num?)?.toDouble() ?? 0;
+        final commission = (order['admin_commission'] as num?)?.toDouble() ?? 0;
+        final netAmount = total - commission;
+        
+        return {
+          'id': order['id'],
+          'type': 'restaurant_payment',
+          'amount': netAmount,
+          'total': total,
+          'commission': commission,
+          'order_number': order['order_number'],
+          'customer_name': order['customer']?['full_name'],
+          'created_at': order['delivered_at'] ?? order['created_at'],
+        };
+      }).toList();
     } catch (e) {
       debugPrint('Erreur getRestaurantTransactions: $e');
-      // Si la table transactions n'existe pas, retourner liste vide
       return [];
     }
   }

@@ -306,6 +306,43 @@ class _DashboardScreenV2State extends State<DashboardScreenV2> {
                       ),
                     const SizedBox(height: 24),
 
+                    // Gestion
+                    const Text('Gestion', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ManagementCard(
+                            icon: Icons.restaurant,
+                            label: 'Restaurants',
+                            count: _stats['total_restaurants'] ?? 0,
+                            color: Colors.orange,
+                            onTap: () => Navigator.pushNamed(context, AppRouter.restaurantsManagement),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _ManagementCard(
+                            icon: Icons.delivery_dining,
+                            label: 'Livreurs',
+                            count: _stats['total_livreurs'] ?? 0,
+                            color: Colors.blue,
+                            onTap: () => Navigator.pushNamed(context, AppRouter.livreursManagement),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _ManagementCard(
+                      icon: Icons.settings,
+                      label: 'Paramètres Système',
+                      subtitle: 'Configuration plateforme',
+                      color: Colors.purple,
+                      onTap: () => Navigator.pushNamed(context, AppRouter.systemSettings),
+                      fullWidth: true,
+                    ),
+                    const SizedBox(height: 24),
+
                     // Actions rapides
                     const Text('Actions rapides', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
@@ -317,7 +354,7 @@ class _DashboardScreenV2State extends State<DashboardScreenV2> {
                         _QuickAction(icon: Icons.report_problem, label: 'Incidents', onTap: () => Navigator.pushNamed(context, AppRouter.incidents)),
                         _QuickAction(icon: Icons.account_balance_wallet, label: 'Finance', onTap: () => Navigator.pushNamed(context, AppRouter.finance)),
                         _QuickAction(icon: Icons.trending_up, label: 'Pricing', onTap: () => Navigator.pushNamed(context, AppRouter.pricing)),
-                        _QuickAction(icon: Icons.settings, label: 'Paramètres', onTap: () => Navigator.pushNamed(context, AppRouter.settings)),
+                        _QuickAction(icon: Icons.history, label: 'Audit', onTap: () => Navigator.pushNamed(context, AppRouter.auditLogs)),
                       ],
                     ),
                   ],
@@ -545,6 +582,80 @@ class _QuickAction extends StatelessWidget {
             Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ManagementCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int? count;
+  final String? subtitle;
+  final Color color;
+  final VoidCallback onTap;
+  final bool fullWidth;
+
+  const _ManagementCard({
+    required this.icon,
+    required this.label,
+    this.count,
+    this.subtitle,
+    required this.color,
+    required this.onTap,
+    this.fullWidth = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [color.withOpacity(0.2), color.withOpacity(0.1)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: fullWidth
+            ? Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: color, size: 24),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold)),
+                        if (subtitle != null)
+                          Text(subtitle!, style: TextStyle(color: color.withOpacity(0.7), fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: color),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, color: color, size: 32),
+                  const SizedBox(height: 12),
+                  if (count != null)
+                    Text('$count', style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold)),
+                  Text(label, style: TextStyle(color: color.withOpacity(0.9), fontSize: 14)),
+                ],
+              ),
       ),
     );
   }
