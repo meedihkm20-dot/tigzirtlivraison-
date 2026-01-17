@@ -939,6 +939,106 @@ class SupabaseService {
   }
 
   // ============================================
+  // LIVREURS MANAGEMENT
+  // ============================================
+
+  /// Activer/Désactiver un livreur
+  static Future<void> toggleLivreurStatus(String livreurId, bool isActive) async {
+    await client.from('livreurs').update({
+      'is_verified': isActive,
+      'is_available': isActive ? false : false,
+      'is_online': isActive ? false : false,
+    }).eq('id', livreurId);
+
+    await logAction(
+      action: isActive ? 'activate_livreur' : 'deactivate_livreur',
+      entityType: 'livreur',
+      entityId: livreurId,
+      reason: isActive ? 'Livreur activé' : 'Livreur désactivé',
+    );
+  }
+
+  /// Récupérer les stats détaillées d'un livreur
+  static Future<Map<String, dynamic>> getLivreurStats(String livreurId) async {
+    try {
+      // Stats de base
+      final livreur = await client
+          .from('livreurs')
+          .select('*, user:profiles!user_id(full_name, phone)')
+          .eq('id', livreurId)
+          .single();
+
+      // Commandes livrées
+      final deliveredOrders = await client
+          .from('orders')
+          .select('id, total, livreur_commission, delivered_at')
+          .eq('livreur_id', livreurId)
+          .eq('status', 'delivered');
+
+      double totalEarnings = 0;
+      for (final order in deliveredOrders) {
+        totalEarnings += (order['livreur_commission'] as num?)?.toDouble() ?? 0;
+      }
+
+      return {
+        ...livreur,
+        'total_deliveries': deliveredOrders.length,
+        'total_earnings': totalEarnings,
+        'deliveries': deliveredOrders,
+      };
+    } catch (e) {
+      print('❌ Erreur getLivreurStats: $e');
+      return {};
+    }
+  }
+
+  // ============================================
+  // RESTAURANTS MANAGEMENT
+  // ============================================
+
+  /// Récupérer les stats détaillées d'un restaurant
+  static Future<Map<String, dynamic>> getRestaurantStats(String restaurantId) async {
+    try {
+      // Stats de base
+      final restaurant = await client
+          .from('restaurants')
+          .select('*, owner:profiles!owner_id(full_name, phone)')
+          .eq('id', restaurantId)
+          .single();
+
+      // Commandes
+      final orders = await client
+          .from('orders')
+          .select('id, total, admin_commission, status, created_at')
+          .eq('restaurant_id', restaurantId);
+
+      double totalRevenue = 0;
+      double totalCommission = 0;
+      int deliveredCount = 0;
+
+      for (final order in orders) {
+        if (order['status'] == 'delivered') {
+          totalRevenue += (order['total'] as num?)?.toDouble() ?? 0;
+          totalCommission += (order['admin_commission'] as num?)?.toDouble() ?? 0;
+          deliveredCount++;
+        }
+      }
+
+      return {
+        ...restaurant,
+        'total_orders': orders.length,
+        'delivered_orders': deliveredCount,
+        'total_revenue': totalRevenue,
+        'total_commission': totalCommission,
+        'net_revenue': totalRevenue - totalCommission,
+      };
+    } catch (e) {
+      print('❌ Erreur getRestaurantStats: $e');
+      return {};
+    }
+  }
+
+  // ============================================
   // UTILS
   // ============================================
 
