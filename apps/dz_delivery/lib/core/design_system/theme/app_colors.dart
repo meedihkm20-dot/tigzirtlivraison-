@@ -111,13 +111,13 @@ class AppColors {
   static const Color restaurantGradientStart = Color(0xFFFF6B35);
   static const Color restaurantGradientEnd = Color(0xFFFF8F66);
   
-  // Client (Teal/Vert)
-  static const Color clientPrimary = Color(0xFF00BFA6);
-  static const Color clientPrimaryLight = Color(0xFF33CCBB);
-  static const Color clientPrimaryDark = Color(0xFF00A896);
-  static const Color clientSurface = Color(0xFFE0F7F4);
-  static const Color clientGradientStart = Color(0xFF00BFA6);
-  static const Color clientGradientEnd = Color(0xFF00D9C4);
+  // Client (Bleu - comme admin)
+  static const Color clientPrimary = Color(0xFF2563EB);
+  static const Color clientPrimaryLight = Color(0xFF3B82F6);
+  static const Color clientPrimaryDark = Color(0xFF1D4ED8);
+  static const Color clientSurface = Color(0xFFEBF2FE);
+  static const Color clientGradientStart = Color(0xFF2563EB);
+  static const Color clientGradientEnd = Color(0xFF3B82F6);
   
   // Livreur (Bleu)
   static const Color livreurPrimary = Color(0xFF2196F3);

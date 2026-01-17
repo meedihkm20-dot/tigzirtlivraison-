@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
 import '../../../../core/design_system/theme/app_spacing.dart';
@@ -944,11 +945,40 @@ class _OrderTrackingScreenV2State extends State<OrderTrackingScreenV2>
     Navigator.pushNamed(context, AppRouter.support);
   }
 
-  void _shareTracking() {
+  void _shareTracking() async {
     HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Lien de suivi copié!')),
-    );
+    
+    final orderNumber = _order?['order_number'] ?? '';
+    final trackingUrl = 'https://dzdelivery.com/track/$orderNumber';
+    final shareText = '''
+🍕 DZ Delivery - Suivi de commande
+
+📦 Commande: $orderNumber
+🚚 Suivez votre livraison en temps réel
+
+$trackingUrl
+
+Merci de votre confiance! 🙏
+''';
+
+    try {
+      // Essayer de partager
+      await Share.share(
+        shareText,
+        subject: 'Suivi de commande DZ Delivery - $orderNumber',
+      );
+    } catch (e) {
+      // Si le partage échoue, copier dans le presse-papiers
+      await Clipboard.setData(ClipboardData(text: trackingUrl));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Lien de suivi copié dans le presse-papiers!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    }
   }
 
   void _showDeliveredDialog() {
