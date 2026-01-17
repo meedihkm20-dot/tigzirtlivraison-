@@ -13,6 +13,7 @@ if (localPropertiesFile.exists()) {
     }
 }
 
+// ✅ AUTO-INCRÉMENTATION VERSION
 def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
 if (flutterVersionCode == null) {
     flutterVersionCode = '1'
@@ -22,6 +23,19 @@ def flutterVersionName = localProperties.getProperty('flutter.versionName')
 if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
+
+// Auto-incrémenter le versionCode basé sur timestamp
+def autoVersionCode = (System.currentTimeMillis() / 1000).toInteger()
+def finalVersionCode = Math.max(flutterVersionCode.toInteger(), autoVersionCode)
+
+// Auto-incrémenter le versionName (format: major.minor.build)
+def versionParts = flutterVersionName.split('\\.')
+def majorVersion = versionParts.length > 0 ? versionParts[0] : '1'
+def minorVersion = versionParts.length > 1 ? versionParts[1] : '0'
+def buildNumber = new Date().format('yyyyMMdd')
+def finalVersionName = "${majorVersion}.${minorVersion}.${buildNumber}"
+
+println "🚀 Auto-version: Code=${finalVersionCode}, Name=${finalVersionName}"
 
 android {
     namespace "com.dzdelivery.app"
@@ -45,8 +59,8 @@ android {
         applicationId "com.dzdelivery.app"
         minSdk 26
         targetSdk 35
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        versionCode finalVersionCode
+        versionName finalVersionName
     }
 
     buildTypes {
