@@ -38,37 +38,36 @@ jobs:
           name: dz-delivery-apk
           path: apps/dz_delivery/build/app/outputs/flutter-apk/app-release.apk
 
-  # Admin App build désactivé pour économiser les minutes GitHub Actions
-  # Décommenter ce job si besoin de builder admin_app
-  # build-admin-app:
-  #   name: Build Admin App APK
-  #   runs-on: ubuntu-latest
-  #   
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     
-  #     - name: Setup Java
-  #       uses: actions/setup-java@v4
-  #       with:
-  #         distribution: 'zulu'
-  #         java-version: '21'
-  #     
-  #     - name: Setup Flutter
-  #       uses: subosito/flutter-action@v2
-  #       with:
-  #         channel: 'stable'
-  #     
-  #     - name: Get dependencies
-  #       working-directory: apps/admin_app
-  #       run: flutter pub get
-  #     
-  #     - name: Build APK
-  #       working-directory: apps/admin_app
-  #       run: flutter build apk --release
-  #     
-  #     - name: Upload APK
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: admin-app-apk
-  #         path: apps/admin_app/build/app/outputs/flutter-apk/app-release.apk
+  # Admin App build
+  build-admin-app:
+    name: Build Admin App APK
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      
+      - name: Get dependencies
+        working-directory: apps/admin_app
+        run: flutter pub get
+      
+      - name: Build APK
+        working-directory: apps/admin_app
+        run: flutter build apk --release
+      
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-app-apk
+          path: apps/admin_app/build/app/outputs/flutter-apk/app-release.apk
 
