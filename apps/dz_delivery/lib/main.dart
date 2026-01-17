@@ -19,7 +19,7 @@ void main() async {
   await PreferencesService.init();
   
   // ✅ Initialiser OneSignal pour les notifications push
-  await OneSignalService.initialize();
+  await OneSignalService.initialize(navKey: DZDeliveryApp.navigatorKey);
   
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -39,6 +39,9 @@ void main() async {
 class DZDeliveryApp extends StatefulWidget {
   const DZDeliveryApp({super.key});
 
+  // Global key for navigation
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  
   // Global key for theme switching
   static final GlobalKey<_DZDeliveryAppState> appKey = GlobalKey<_DZDeliveryAppState>();
 
@@ -61,6 +64,7 @@ class _DZDeliveryAppState extends State<DZDeliveryApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       key: DZDeliveryApp.appKey,
+      navigatorKey: DZDeliveryApp.navigatorKey,
       title: 'DZ Delivery',
       debugShowCheckedModeBanner: false,
       theme: AppThemeV2.lightTheme,

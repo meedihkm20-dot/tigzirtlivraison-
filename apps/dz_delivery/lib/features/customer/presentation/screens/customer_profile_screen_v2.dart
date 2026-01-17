@@ -7,6 +7,7 @@ import '../../../../core/design_system/theme/app_spacing.dart';
 import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/design_system/components/loaders/skeleton_loader.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/services/onesignal_service.dart';
 import '../../../../core/router/app_router.dart';
 
 /// Écran Profil Client V2 - Premium
@@ -648,6 +649,7 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
       {'icon': Icons.favorite, 'label': 'Favoris', 'route': AppRouter.favorites},
       {'icon': Icons.card_giftcard, 'label': 'Parrainage', 'route': AppRouter.referral},
       {'icon': Icons.notifications, 'label': 'Notifications', 'route': AppRouter.notifications},
+      {'icon': Icons.bug_report, 'label': 'Test Notifications', 'route': null, 'action': 'test_notifications'},
       {'icon': Icons.help_outline, 'label': 'Aide & Support', 'route': null},
       {'icon': Icons.info_outline, 'label': 'À propos', 'route': null},
     ];
@@ -687,7 +689,11 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                       onTap: () {
                         HapticFeedback.lightImpact();
                         final route = item['route'] as String?;
-                        if (route != null) {
+                        final action = item['action'] as String?;
+                        
+                        if (action == 'test_notifications') {
+                          _testNotifications();
+                        } else if (route != null) {
                           Navigator.pushNamed(context, route);
                         }
                       },
@@ -932,5 +938,150 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
         Navigator.pushNamedAndRemoveUntil(context, AppRouter.login, (route) => false);
       }
     }
+  }
+
+  /// Test des notifications OneSignal
+  void _testNotifications() async {
+    HapticFeedback.lightImpact();
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('🧪 Test Notifications'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Tester les notifications OneSignal:'),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.notifications_active, color: AppColors.clientPrimary),
+              title: const Text('Notification de test'),
+              subtitle: const Text('Affiche une notification locale'),
+              onTap: () {
+                Navigator.pop(ctx);
+                OneSignalService.sendTestNotification();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('🧪 Notification de test envoyée!'),
+                    backgroundColor: AppColors.success,
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.info, color: AppColors.textSecondary),
+              title: const Text('Statut OneSignal'),
+              subtitle: FutureBuilder<bool>(
+                future: OneSignalService.areNotificationsEnabled(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    return Text(
+                      snapshot.data! ? '✅ Activées' : '❌ Désactivées',
+                      style: TextStyle(
+                        color: snapshot.data! ? AppColors.success : AppColors.error,
+                      ),
+                    );
+                  }
+                  return const Text('Vérification...');
+                },
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.fingerprint, color: AppColors.textSecondary),
+              title: const Text('Player ID'),
+              subtitle: FutureBuilder<String?>(
+                future: OneSignalService.getPlayerId(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData && snapshot.data != null) {
+                    return Text(
+                      snapshot.data!.length > 8 
+                          ? '${snapshot.data!.substring(0, 8)}...'
+                          : snapshot.data!,
+                      style: const TextStyle(fontFamily: 'monospace'),
+                    );
+                  }
+                  return const Text('Non disponible');
+                },
+              ),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.bug_report, color: AppColors.warning),
+              title: const Text('Debug complet'),
+              subtitle: const Text('Afficher toutes les infos'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showDebugInfo();
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Afficher les informations de debug OneSignal
+  void _showDebugInfo() async {
+    final debugInfo = await OneSignalService.getDebugInfo();
+    
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('🔍 Debug OneSignal'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ...debugInfo.entries.map((entry) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 120,
+                      child: Text(
+                        '${entry.key}:',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        entry.value?.toString() ?? 'null',
+                        style: const TextStyle(fontFamily: 'monospace'),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+              const SizedBox(height: 16),
+              const Text(
+                'Si Player ID est null, les notifications ne fonctionneront pas.',
+                style: TextStyle(
+                  color: AppColors.warning,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
   }
 }
