@@ -30,6 +30,8 @@ import '../../features/restaurant/presentation/screens/restaurant_finance_screen
 import '../../features/restaurant/presentation/screens/restaurant_order_history_screen.dart';
 import '../../features/restaurant/presentation/screens/restaurant_profile_screen_v2.dart';
 import '../../features/restaurant/presentation/screens/restaurant_livreur_management_screen.dart';
+import '../../features/restaurant/presentation/screens/restaurant_profile_screen_v2.dart';
+import '../../features/restaurant/presentation/screens/restaurant_livreur_management_screen.dart';
 import '../../features/restaurant/presentation/screens/kitchen_screen_v2.dart';
 import '../../features/restaurant/presentation/screens/stats_screen_v2.dart';
 import '../../features/restaurant/presentation/screens/stock_management_screen.dart';

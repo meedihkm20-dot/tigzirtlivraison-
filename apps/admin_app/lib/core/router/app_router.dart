@@ -30,8 +30,8 @@ class AppRouter {
   static const String systemSettings = '/system-settings';
   static const String pricing = '/pricing';
 
-  static Route<dynamic> generateRoute(RouteSettings settings) {
-    switch (settings.name) {
+  static Route<dynamic> generateRoute(RouteSettings routeSettings) {
+    switch (routeSettings.name) {
       case splash:
         return MaterialPageRoute(builder: (_) => const SplashScreen());
       case login:
@@ -63,7 +63,7 @@ class AppRouter {
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(
-            body: Center(child: Text('Route non trouvée: ${settings.name}')),
+            body: Center(child: Text('Route non trouvée: ${routeSettings.name}')),
           ),
         );
     }
