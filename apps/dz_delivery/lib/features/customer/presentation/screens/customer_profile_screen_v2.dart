@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
 import '../../../../core/design_system/theme/app_spacing.dart';
@@ -8,7 +9,9 @@ import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/design_system/components/loaders/skeleton_loader.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/onesignal_service.dart';
+import '../../../../core/services/preferences_service.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../main.dart';
 
 /// Écran Profil Client V2 - Premium
 /// Gamification complète: niveaux, badges, fidélité, stats, parrainage
@@ -186,6 +189,27 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                     ),
                     Positioned(
                       bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _changeProfilePicture,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.clientPrimary,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: AppShadows.sm,
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 0,
                       right: 0,
                       child: Container(
                         padding: const EdgeInsets.all(6),
@@ -769,23 +793,34 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
               title: const Text('Modifier le profil'),
               onTap: () {
                 Navigator.pop(ctx);
-                // TODO: Edit profile
+                _editProfile();
               },
             ),
             ListTile(
               leading: const Icon(Icons.dark_mode),
               title: const Text('Mode sombre'),
               trailing: Switch(
-                value: false,
-                onChanged: (v) {},
+                value: PreferencesService.isDarkMode,
+                onChanged: (value) async {
+                  await PreferencesService.setDarkMode(value);
+                  // Mettre à jour le thème de l'app
+                  if (mounted) {
+                    DZDeliveryApp.setThemeMode(
+                      value ? ThemeMode.dark : ThemeMode.light,
+                    );
+                  }
+                },
                 activeColor: AppColors.clientPrimary,
               ),
             ),
             ListTile(
               leading: const Icon(Icons.language),
               title: const Text('Langue'),
-              subtitle: const Text('Français'),
-              onTap: () {},
+              subtitle: Text(_getLanguageLabel(PreferencesService.language)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showLanguageSelector();
+              },
             ),
             ListTile(
               leading: const Icon(Icons.delete_forever, color: AppColors.error),
@@ -909,6 +944,353 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
               // TODO: Delete account
             },
             child: Text('Supprimer', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Changer la photo de profil
+  void _changeProfilePicture() async {
+    HapticFeedback.lightImpact();
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Changer la photo de profil',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildImageSourceOption(
+                  icon: Icons.camera_alt,
+                  label: 'Caméra',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                _buildImageSourceOption(
+                  icon: Icons.photo_library,
+                  label: 'Galerie',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+                if (_profile?['avatar_url'] != null)
+                  _buildImageSourceOption(
+                    icon: Icons.delete,
+                    label: 'Supprimer',
+                    color: AppColors.error,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _removeProfilePicture();
+                    },
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageSourceOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? color,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: (color ?? AppColors.clientPrimary).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: color ?? AppColors.clientPrimary,
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: color ?? AppColors.textPrimary,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Sélectionner et uploader une image
+  void _pickImage(ImageSource source) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 80,
+      );
+
+      if (image == null) return;
+
+      // Afficher un loader
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const Center(
+          child: CircularProgressIndicator(color: AppColors.clientPrimary),
+        ),
+      );
+
+      // Upload vers Supabase Storage
+      final bytes = await image.readAsBytes();
+      final userId = SupabaseService.currentUserId;
+      final fileName = 'avatar_${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      
+      final avatarUrl = await SupabaseService.uploadAvatar(fileName, bytes);
+      
+      // Mettre à jour le profil
+      await SupabaseService.updateProfile({'avatar_url': avatarUrl});
+      
+      // Recharger les données
+      await _loadData();
+      
+      if (mounted) {
+        Navigator.pop(context); // Fermer le loader
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo de profil mise à jour! 📸'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Fermer le loader
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Supprimer la photo de profil
+  void _removeProfilePicture() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const Center(
+          child: CircularProgressIndicator(color: AppColors.clientPrimary),
+        ),
+      );
+
+      await SupabaseService.updateProfile({'avatar_url': null});
+      await _loadData();
+      
+      if (mounted) {
+        Navigator.pop(context); // Fermer le loader
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo de profil supprimée'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Obtenir le label de la langue
+  String _getLanguageLabel(String languageCode) {
+    switch (languageCode) {
+      case 'fr':
+        return 'Français';
+      case 'ar':
+        return 'العربية';
+      case 'en':
+        return 'English';
+      default:
+        return 'Français';
+    }
+  }
+
+  /// Afficher le sélecteur de langue
+  void _showLanguageSelector() {
+    final languages = [
+      {'code': 'fr', 'name': 'Français', 'flag': '🇫🇷'},
+      {'code': 'ar', 'name': 'العربية', 'flag': '🇩🇿'},
+      {'code': 'en', 'name': 'English', 'flag': '🇺🇸'},
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Choisir la langue'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: languages.map((lang) => ListTile(
+            leading: Text(lang['flag']!, style: const TextStyle(fontSize: 24)),
+            title: Text(lang['name']!),
+            trailing: PreferencesService.language == lang['code']
+                ? const Icon(Icons.check, color: AppColors.clientPrimary)
+                : null,
+            onTap: () async {
+              await PreferencesService.setLanguage(lang['code']!);
+              if (mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Langue changée: ${lang['name']}'),
+                    backgroundColor: AppColors.success,
+                  ),
+                );
+                // Note: Pour une implémentation complète, il faudrait redémarrer l'app
+                // ou utiliser un système d'internationalisation comme flutter_localizations
+              }
+            },
+          )).toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Éditer le profil utilisateur
+  void _editProfile() {
+    final nameController = TextEditingController(text: _profile?['full_name'] ?? '');
+    final phoneController = TextEditingController(text: _profile?['phone'] ?? '');
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Modifier le profil'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Nom complet',
+                prefixIcon: Icon(Icons.person),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: phoneController,
+              decoration: const InputDecoration(
+                labelText: 'Téléphone',
+                prefixIcon: Icon(Icons.phone),
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              final phone = phoneController.text.trim();
+              
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Le nom ne peut pas être vide'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+                return;
+              }
+              
+              try {
+                Navigator.pop(ctx);
+                
+                // Afficher loader
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (ctx) => const Center(
+                    child: CircularProgressIndicator(color: AppColors.clientPrimary),
+                  ),
+                );
+                
+                await SupabaseService.updateProfile({
+                  'full_name': name,
+                  'phone': phone.isNotEmpty ? phone : null,
+                });
+                
+                await _loadData();
+                
+                if (mounted) {
+                  Navigator.pop(context); // Fermer loader
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Profil mis à jour! ✅'),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(context); // Fermer loader
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erreur: ${e.toString()}'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.clientPrimary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Sauvegarder'),
           ),
         ],
       ),

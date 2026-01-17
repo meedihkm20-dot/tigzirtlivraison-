@@ -1730,4 +1730,58 @@ class SupabaseService {
     if (deliveries >= 50) return 'Silver';
     return 'Bronze';
   }
+
+  // ============================================
+  // PROFIL UTILISATEUR
+  // ============================================
+
+  /// Récupérer le profil de l'utilisateur connecté
+  static Future<Map<String, dynamic>?> getProfile() async {
+    if (currentUserId == null) return null;
+    
+    final response = await client
+        .from('profiles')
+        .select()
+        .eq('id', currentUserId!)
+        .single();
+    
+    return response;
+  }
+
+  /// Mettre à jour le profil utilisateur
+  static Future<void> updateProfile(Map<String, dynamic> updates) async {
+    if (currentUserId == null) throw Exception('Utilisateur non connecté');
+    
+    await client
+        .from('profiles')
+        .update(updates)
+        .eq('id', currentUserId!);
+  }
+
+  /// Upload d'avatar vers Supabase Storage
+  static Future<String> uploadAvatar(String fileName, Uint8List bytes) async {
+    if (currentUserId == null) throw Exception('Utilisateur non connecté');
+    
+    // Upload vers le bucket avatars
+    await client.storage
+        .from('avatars')
+        .uploadBinary(fileName, bytes, fileOptions: const FileOptions(
+          cacheControl: '3600',
+          upsert: true,
+        ));
+    
+    // Récupérer l'URL publique
+    final url = client.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+    
+    return url;
+  }
+
+  /// Supprimer un avatar du storage
+  static Future<void> deleteAvatar(String fileName) async {
+    await client.storage
+        .from('avatars')
+        .remove([fileName]);
+  }
 }
