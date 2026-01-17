@@ -42,34 +42,52 @@ class OsmMap extends StatelessWidget {
 }
 
 class MapMarkers {
-  static Marker livreur(LatLng position) {
+  /// Marker livreur cliquable
+  static Marker livreur(
+    LatLng position, {
+    String? livreurId,
+    String? name,
+    VoidCallback? onTap,
+  }) {
     return Marker(
       point: position,
       width: 50,
       height: 50,
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF2E7D32),
-          shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF2E7D32),
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+          ),
+          child: const Icon(Icons.delivery_dining, color: Colors.white, size: 30),
         ),
-        child: const Icon(Icons.delivery_dining, color: Colors.white, size: 30),
       ),
     );
   }
 
-  static Marker restaurant(LatLng position) {
+  /// Marker restaurant cliquable
+  static Marker restaurant(
+    LatLng position, {
+    String? restaurantId,
+    String? name,
+    VoidCallback? onTap,
+  }) {
     return Marker(
       point: position,
       width: 40,
       height: 40,
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFFE65100),
-          shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFE65100),
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+          ),
+          child: const Icon(Icons.restaurant, color: Colors.white, size: 22),
         ),
-        child: const Icon(Icons.restaurant, color: Colors.white, size: 22),
       ),
     );
   }

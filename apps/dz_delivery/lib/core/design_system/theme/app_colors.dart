@@ -56,32 +56,32 @@ class AppColors {
   static const Color divider = Color(0xFFE5E7EB);
 
   // ============================================
-  // TEXT COLORS - LIGHT MODE
+  // TEXT COLORS - LIGHT MODE (AMÉLIORÉS)
   // ============================================
-  static const Color textPrimary = Color(0xFF1A1A1A);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const Color textTertiary = Color(0xFF9CA3AF);
-  static const Color textDisabled = Color(0xFFBDBDBD);
+  static const Color textPrimary = Color(0xFF0F172A);      // Noir plus profond
+  static const Color textSecondary = Color(0xFF475569);    // Gris plus foncé, meilleur contraste
+  static const Color textTertiary = Color(0xFF64748B);     // Gris moyen plus lisible
+  static const Color textDisabled = Color(0xFF94A3B8);     // Gris clair amélioré
   static const Color textOnPrimary = Color(0xFFFFFFFF);
   static const Color textOnSecondary = Color(0xFFFFFFFF);
-  static const Color textOnSurface = Color(0xFF1A1A1A);
+  static const Color textOnSurface = Color(0xFF0F172A);
 
   // ============================================
-  // NEUTRAL COLORS - DARK MODE
+  // NEUTRAL COLORS - DARK MODE (AMÉLIORÉS)
   // ============================================
-  static const Color darkBackground = Color(0xFF0F0F0F);
-  static const Color darkSurface = Color(0xFF1A1A1A);
-  static const Color darkSurfaceVariant = Color(0xFF262626);
-  static const Color darkSurfaceElevated = Color(0xFF2D2D2D);
-  static const Color darkOutline = Color(0xFF404040);
-  static const Color darkDivider = Color(0xFF333333);
+  static const Color darkBackground = Color(0xFF0A0A0A);      // Noir plus profond
+  static const Color darkSurface = Color(0xFF1E1E1E);        // Surface plus claire
+  static const Color darkSurfaceVariant = Color(0xFF2A2A2A);  // Variant plus visible
+  static const Color darkSurfaceElevated = Color(0xFF333333); // Élevé plus contrasté
+  static const Color darkOutline = Color(0xFF525252);         // Outline plus visible
+  static const Color darkDivider = Color(0xFF404040);         // Divider plus contrasté
 
   // ============================================
-  // TEXT COLORS - DARK MODE
+  // TEXT COLORS - DARK MODE (AMÉLIORÉS)
   // ============================================
-  static const Color darkTextPrimary = Color(0xFFF5F5F5);
-  static const Color darkTextSecondary = Color(0xFFA3A3A3);
-  static const Color darkTextTertiary = Color(0xFF737373);
+  static const Color darkTextPrimary = Color(0xFFFAFAFA);     // Blanc plus doux
+  static const Color darkTextSecondary = Color(0xFFD1D5DB);   // Gris clair plus lisible
+  static const Color darkTextTertiary = Color(0xFF9CA3AF);    // Gris moyen plus contrasté
 
   // ============================================
   // ORDER STATUS COLORS

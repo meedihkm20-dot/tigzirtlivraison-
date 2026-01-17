@@ -27,9 +27,7 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
   bool _isLoading = true;
   
   Map<String, dynamic>? _profile;
-  Map<String, dynamic>? _loyalty;
   Map<String, dynamic>? _stats;
-  List<Map<String, dynamic>> _badges = [];
   List<Map<String, dynamic>> _recentOrders = [];
   
   late AnimationController _progressController;
@@ -60,19 +58,15 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
     try {
       final results = await Future.wait([
         _safeCall(() => SupabaseService.getProfile(), null),
-        _safeCall(() => SupabaseService.getCustomerLoyalty(), <String, dynamic>{}),
         _safeCall(() => SupabaseService.getCustomerStats(), <String, dynamic>{}),
-        _safeCall(() => SupabaseService.getCustomerBadges(), <Map<String, dynamic>>[]),
         _safeCall(() => SupabaseService.getRecentOrders(limit: 3), <Map<String, dynamic>>[]),
       ]);
 
       if (mounted) {
         setState(() {
           _profile = results[0] as Map<String, dynamic>?;
-          _loyalty = results[1] as Map<String, dynamic>;
-          _stats = results[2] as Map<String, dynamic>;
-          _badges = results[3] as List<Map<String, dynamic>>;
-          _recentOrders = results[4] as List<Map<String, dynamic>>;
+          _stats = results[1] as Map<String, dynamic>;
+          _recentOrders = results[2] as List<Map<String, dynamic>>;
           _isLoading = false;
         });
         _progressController.forward();
@@ -91,28 +85,6 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
     }
   }
 
-  // Loyalty level calculation
-  int get _currentLevel => ((_loyalty?['points'] ?? 0) / 500).floor() + 1;
-  int get _pointsInLevel => (_loyalty?['points'] ?? 0) % 500;
-  int get _pointsToNextLevel => 500 - _pointsInLevel;
-  double get _levelProgress => _pointsInLevel / 500;
-
-  String get _levelName {
-    if (_currentLevel >= 5) return 'Diamant';
-    if (_currentLevel >= 4) return 'Or';
-    if (_currentLevel >= 3) return 'Argent';
-    if (_currentLevel >= 2) return 'Bronze';
-    return 'Débutant';
-  }
-
-  Color get _levelColor {
-    if (_currentLevel >= 5) return AppColors.tierDiamond;
-    if (_currentLevel >= 4) return AppColors.tierGold;
-    if (_currentLevel >= 3) return AppColors.tierSilver;
-    if (_currentLevel >= 2) return AppColors.tierBronze;
-    return AppColors.textTertiary;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,9 +98,7 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   _buildHeader(),
-                  SliverToBoxAdapter(child: _buildLoyaltyCard()),
                   SliverToBoxAdapter(child: _buildStatsGrid()),
-                  SliverToBoxAdapter(child: _buildBadgesSection()),
                   SliverToBoxAdapter(child: _buildRecentOrders()),
                   SliverToBoxAdapter(child: _buildMenuSection()),
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
@@ -208,25 +178,6 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                         ),
                       ),
                     ),
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: _levelColor,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: Text(
-                          '$_currentLevel',
-                          style: AppTypography.labelSmall.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -238,28 +189,11 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
                   ),
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.workspace_premium, color: _levelColor, size: 16),
-                          const SizedBox(width: 4),
-                          Text(
-                            _levelName,
-                            style: AppTypography.labelMedium.copyWith(color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                Text(
+                  email,
+                  style: AppTypography.bodySmall.copyWith(
+                    color: Colors.white.withOpacity(0.9),
+                  ),
                 ),
               ],
             ),
@@ -671,7 +605,6 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
     final menuItems = [
       {'icon': Icons.location_on, 'label': 'Mes adresses', 'route': AppRouter.savedAddresses},
       {'icon': Icons.favorite, 'label': 'Favoris', 'route': AppRouter.favorites},
-      {'icon': Icons.card_giftcard, 'label': 'Parrainage', 'route': AppRouter.referral},
       {'icon': Icons.notifications, 'label': 'Notifications', 'route': AppRouter.notifications},
       {'icon': Icons.bug_report, 'label': 'Test Notifications', 'route': null, 'action': 'test_notifications'},
       {'icon': Icons.help_outline, 'label': 'Aide & Support', 'route': null},
@@ -832,100 +765,6 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showRewardsSheet() {
-    final rewards = [
-      {'points': 100, 'reward': 'Livraison gratuite', 'icon': '🚚'},
-      {'points': 250, 'reward': '-10% sur commande', 'icon': '🏷️'},
-      {'points': 500, 'reward': 'Dessert offert', 'icon': '🍰'},
-      {'points': 1000, 'reward': '-25% sur commande', 'icon': '🎁'},
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Échanger vos points', style: AppTypography.titleMedium),
-            const SizedBox(height: 16),
-            ...rewards.map((r) => ListTile(
-              leading: Text(r['icon'] as String, style: const TextStyle(fontSize: 28)),
-              title: Text(r['reward'] as String),
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: (_loyalty?['points'] ?? 0) >= (r['points'] as int)
-                      ? AppColors.clientPrimary
-                      : AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '${r['points']} pts',
-                  style: AppTypography.labelSmall.copyWith(
-                    color: (_loyalty?['points'] ?? 0) >= (r['points'] as int)
-                        ? Colors.white
-                        : AppColors.textTertiary,
-                  ),
-                ),
-              ),
-              onTap: (_loyalty?['points'] ?? 0) >= (r['points'] as int)
-                  ? () => _redeemReward(r)
-                  : null,
-            )),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showBadgeDetails(Map<String, dynamic> badge) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(badge['icon'] ?? '🏆', style: const TextStyle(fontSize: 60)),
-            const SizedBox(height: 16),
-            Text(badge['name'] ?? '', style: AppTypography.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              badge['unlocked'] == true
-                  ? 'Badge débloqué! 🎉'
-                  : 'Continuez pour débloquer ce badge',
-              style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _redeemReward(Map<String, dynamic> reward) {
-    HapticFeedback.heavyImpact();
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${reward['reward']} échangé! 🎉'),
-        backgroundColor: AppColors.success,
       ),
     );
   }

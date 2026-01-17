@@ -87,54 +87,57 @@ class AppTypography {
   );
 
   // ============================================
-  // BODY STYLES
+  // BODY STYLES (AMÉLIORÉS)
   // ============================================
   static const TextStyle bodyLarge = TextStyle(
     fontFamily: fontFamily,
-    fontSize: 16,
-    fontWeight: FontWeight.normal,
+    fontSize: 17,        // Augmenté de 16 à 17
+    fontWeight: FontWeight.w400,
     height: 1.5,
+    letterSpacing: 0.1,  // Ajout d'espacement
   );
 
   static const TextStyle bodyMedium = TextStyle(
     fontFamily: fontFamily,
-    fontSize: 14,
-    fontWeight: FontWeight.normal,
+    fontSize: 15,        // Augmenté de 14 à 15
+    fontWeight: FontWeight.w400,
     height: 1.5,
+    letterSpacing: 0.1,  // Ajout d'espacement
   );
 
   static const TextStyle bodySmall = TextStyle(
     fontFamily: fontFamily,
-    fontSize: 12,
-    fontWeight: FontWeight.normal,
+    fontSize: 13,        // Augmenté de 12 à 13
+    fontWeight: FontWeight.w400,
     height: 1.4,
+    letterSpacing: 0.1,  // Ajout d'espacement
   );
 
   // ============================================
-  // LABEL STYLES
+  // LABEL STYLES (AMÉLIORÉS)
   // ============================================
   static const TextStyle labelLarge = TextStyle(
     fontFamily: fontFamily,
-    fontSize: 14,
+    fontSize: 15,        // Augmenté de 14 à 15
     fontWeight: FontWeight.w600,
     height: 1.4,
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,  // Réduit de 0.5 à 0.3
   );
 
   static const TextStyle labelMedium = TextStyle(
     fontFamily: fontFamily,
-    fontSize: 12,
+    fontSize: 13,        // Augmenté de 12 à 13
     fontWeight: FontWeight.w600,
     height: 1.4,
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,  // Réduit de 0.5 à 0.3
   );
 
   static const TextStyle labelSmall = TextStyle(
     fontFamily: fontFamily,
-    fontSize: 10,
+    fontSize: 11,        // Augmenté de 10 à 11
     fontWeight: FontWeight.w600,
     height: 1.4,
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,  // Réduit de 0.5 à 0.3
   );
 
   // ============================================
