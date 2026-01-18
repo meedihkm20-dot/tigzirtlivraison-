@@ -38,14 +38,14 @@ jobs:
           name: dz-delivery-apk
           path: apps/dz_delivery/build/app/outputs/flutter-apk/app-release.apk
 
-      - name: Distribute to Firebase
-        uses: wzieba/Firebase-Distribution-Github-Action@v1.7.0
-        with:
-          appId: "1:613654100148:android:e9b06e00cac30805b37fe1"
-          serviceCredentialsFileContent: ${{ secrets.FIREBASE_CREDENTIAL_FILE_CONTENT }}
-          groups: app-livraisonbeta-testers
-          file: apps/dz_delivery/build/app/outputs/flutter-apk/app-release.apk
-          debug: true
+#      - name: Distribute to Firebase
+#        uses: wzieba/Firebase-Distribution-Github-Action@v1.7.0
+#        with:
+#          appId: "1:613654100148:android:e9b06e00cac30805b37fe1"
+#          serviceCredentialsFileContent: ${{ secrets.FIREBASE_CREDENTIAL_FILE_CONTENT }}
+#          groups: app-livraisonbeta-testers
+#          file: apps/dz_delivery/build/app/outputs/flutter-apk/app-release.apk
+#          debug: true
 
   # Admin App build
   build-admin-app:

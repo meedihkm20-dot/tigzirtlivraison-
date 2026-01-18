@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/onesignal_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -37,7 +38,13 @@ class _SplashScreenState extends State<SplashScreen> {
         Navigator.pushReplacementNamed(context, AppRouter.login);
         return;
       }
-      
+
+      // 💪 FIX: Ré-enregistrer l'utilisateur OneSignal à chaque lancement
+      final userId = SupabaseService.currentUserId;
+      if (userId != null) {
+        await OneSignalService.login(userId, role: role);
+      }
+
       switch (role) {
         case 'customer':
           Navigator.pushReplacementNamed(context, AppRouter.customerHome);
