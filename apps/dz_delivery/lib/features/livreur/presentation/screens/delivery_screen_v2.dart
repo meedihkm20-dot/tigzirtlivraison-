@@ -111,7 +111,8 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
       if (order != null && mounted) {
         setState(() {
           _order = order;
-          _currentStep = order['status'] == 'picked_up' ? 'delivery' : 'pickup';
+          // 'verifying' is treated as early pickup stage
+          _currentStep = (order['status'] == 'picked_up' || order['status'] == 'delivering') ? 'delivery' : 'pickup';
           
           // ⚠️ Utilise les noms SQL corrects
           final restaurant = order['restaurant'];
@@ -826,6 +827,72 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
               child: Builder(
                 builder: (context) {
                   final status = _order?['status'];
+                  
+                  // ✅ MODE VÉRIFICATION (SÉCURITÉ)
+                  if (status == 'verifying') {
+                    return Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.infoSurface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.info),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.security, color: AppColors.info),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Appelez le client pour valider la commande avant la préparation.',
+                                  style: AppTypography.bodySmall.copyWith(color: AppColors.info),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  final phone = _order?['customer_phone'] as String?;
+                                  if (phone != null) _callContact(phone);
+                                },
+                                icon: const Icon(Icons.call, color: AppColors.livreurPrimary),
+                                label: const Text('Appeler'),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  side: const BorderSide(color: AppColors.livreurPrimary),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton.icon(
+                                onPressed: _confirmVerification,
+                                icon: const Icon(Icons.verified_user),
+                                label: const Text('Client Validé'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.success,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        TextButton(
+                          onPressed: _cancelVerification,
+                          child: const Text('Client ne répond pas / Annuler', style: TextStyle(color: AppColors.error)),
+                        ),
+                      ],
+                    );
+                  }
+
                   // ✅ FIX: Bouton actif UNIQUEMENT si la commande est prête
                   final isReady = status == 'ready';
                   
@@ -1043,6 +1110,77 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Code incorrect ou erreur: $e'), backgroundColor: AppColors.error),
       );
+    }
+  }
+
+  // ✅ ACTION: Validation Client (Débloque le restaurant)
+  void _confirmVerification() async {
+    HapticFeedback.heavyImpact();
+    setState(() => _isLoading = true);
+    
+    try {
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.changeOrderStatus(widget.orderId, 'confirmed');
+      
+      // Annoncer
+      VoiceNavigationService.announceDeliveryStatus('confirmed');
+      
+      if (mounted) {
+         setState(() {
+           _isLoading = false;
+           // Force le refresh local si le stream n'est pas instantané
+           _order!['status'] = 'confirmed';
+         });
+         
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Client validé! Le restaurant commence la préparation. 🍳'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e')),
+        );
+      }
+    }
+  }
+
+  // ❌ ACTION: Annulation / Faux Bond
+  void _cancelVerification() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Annuler / Faux Bond ?'),
+        content: const Text('Êtes-vous sûr ? Cela signalera le client et annulera la commande.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Retour')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Annuler (Faux Bond)', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm != true) return;
+    
+    setState(() => _isLoading = true);
+    try {
+      final backendApi = BackendApiService(SupabaseService.client);
+      await backendApi.cancelOrder(widget.orderId, 'failed_verification'); // Nouveau motif
+      
+      if (mounted) {
+        Navigator.pop(context); // Retour
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
+      }
     }
   }
 

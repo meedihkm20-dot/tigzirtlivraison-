@@ -9,7 +9,8 @@ import { CancelOrderDto, CancellationReason } from './dto/cancel-order.dto';
 
 // Transitions autorisées (RÈGLE MÉTIER STRICTE)
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  'pending': ['confirmed', 'cancelled'],
+  'pending': ['verifying', 'confirmed', 'cancelled'], // 'confirmed' kept for backwardcompat/admin
+  'verifying': ['confirmed', 'cancelled'],
   'confirmed': ['preparing', 'cancelled'],
   'preparing': ['ready', 'cancelled'],
   'ready': ['picked_up'],
@@ -19,7 +20,10 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 
 // Rôles autorisés pour chaque transition
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-  'pending->confirmed': ['livreur'],
+  'pending->verifying': ['livreur'],
+  'verifying->confirmed': ['livreur'],
+  'verifying->cancelled': ['livreur'], // Livreur can cancel if fake/no-answer
+  'pending->confirmed': ['livreur', 'restaurant'], // Restaurant backup
   'pending->cancelled': ['customer', 'restaurant'],
   'confirmed->preparing': ['restaurant'],
   'confirmed->cancelled': ['customer', 'restaurant'],

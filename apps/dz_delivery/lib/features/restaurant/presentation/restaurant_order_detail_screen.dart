@@ -454,51 +454,6 @@ class _RestaurantOrderDetailScreenState extends State<RestaurantOrderDetailScree
       default: return status ?? '';
     }
   }
-}
-
-class _PrepTimeDialog extends StatefulWidget {
-  @override
-  State<_PrepTimeDialog> createState() => _PrepTimeDialogState();
-}
-
-class _PrepTimeDialogState extends State<_PrepTimeDialog> {
-  int _selectedTime = 15;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Temps de préparation'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('Combien de temps pour préparer cette commande ?'),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            children: [10, 15, 20, 30, 45, 60].map((time) {
-              return ChoiceChip(
-                label: Text('$time min'),
-                selected: _selectedTime == time,
-                onSelected: (selected) {
-                  if (selected) setState(() => _selectedTime = time);
-                },
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Annuler'),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context, _selectedTime),
-          child: const Text('Confirmer'),
-        ),
-      ],
-    );
-  }
   // ✅ Notification personnalisée en haut (Overlay)
   void _showTopToast(String message, {Color color = AppColors.success}) {
     if (!mounted) return;
@@ -562,3 +517,48 @@ class _PrepTimeDialogState extends State<_PrepTimeDialog> {
     });
   }
 }
+
+class _PrepTimeDialog extends StatefulWidget {
+  @override
+  State<_PrepTimeDialog> createState() => _PrepTimeDialogState();
+}
+
+class _PrepTimeDialogState extends State<_PrepTimeDialog> {
+  int _selectedTime = 15;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Temps de préparation'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Combien de temps pour préparer cette commande ?'),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            children: [10, 15, 20, 30, 45, 60].map((time) {
+              return ChoiceChip(
+                label: Text('$time min'),
+                selected: _selectedTime == time,
+                onSelected: (selected) {
+                  if (selected) setState(() => _selectedTime = time);
+                },
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _selectedTime),
+          child: const Text('Confirmer'),
+        ),
+      ],
+    );
+  }
+

@@ -101,8 +101,6 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
     // ✅ Utiliser le provider pour les données
     final livreurState = ref.watch(livreurProvider);
     final isOnline = livreurState.isOnline;
-    final livreurState = ref.watch(livreurProvider);
-    final isOnline = livreurState.isOnline;
     final currentDeliveries = livreurState.currentDeliveries; // ✅ Liste complète
     
     return Scaffold(
@@ -983,15 +981,15 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
     
     try {
       // ✅ Migration: Utilise le backend au lieu de Supabase direct
-      // ⚠️ Le status SQL correct est 'confirmed' (pas 'accepted')
+      // ⚠️ Le status SQL correct est 'verifying' (Sécurité)
       final backendApi = BackendApiService(SupabaseService.client);
-      await backendApi.changeOrderStatus(order['id'], 'confirmed');
+      await backendApi.changeOrderStatus(order['id'], 'verifying');
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Commande acceptée! 🎉'),
-            backgroundColor: AppColors.success,
+            content: Text('Vérification requise... 📞'),
+            backgroundColor: AppColors.info,
           ),
         );
         
