@@ -10,6 +10,7 @@ import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/backend_api_service.dart';
 import '../../../../providers/providers.dart';
+import '../../../../providers/simple_mode_provider.dart';
 
 /// Écran Cuisine Premium V2
 /// Vue en grille avec priorités visuelles, sons et animations
@@ -218,6 +219,7 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
   Widget build(BuildContext context) {
     // ✅ Utiliser le provider pour les commandes (synchronisé avec Dashboard)
     final orders = ref.watch(pendingOrdersProvider);
+    final isSimpleMode = ref.watch(simpleModeProvider).restaurantSimpleMode;
     final filteredOrders = _getFilteredOrders(orders);
     // ✅ Nouvelles = pending OU confirmed
     final newCount = orders.where((o) => 
@@ -236,22 +238,25 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
                   onRefresh: _loadOrders,
                   child: Column(
                     children: [
-                      // Filtres
-                      _buildFilters(newCount, preparingCount, orders.length),
+                      // Mode Simple Toggle
+                      if (!isSimpleMode) _buildFilters(newCount, preparingCount, orders.length),
+                      if (isSimpleMode) _buildSimpleModeHeader(filteredOrders.length),
                       
                       // Grille des commandes
                       Expanded(
-                        child: GridView.builder(
-                          padding: AppSpacing.screen,
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
-                            childAspectRatio: 0.72,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
-                          itemCount: filteredOrders.length,
-                          itemBuilder: (context, index) => _buildOrderCard(filteredOrders[index]),
-                        ),
+                        child: isSimpleMode
+                            ? _buildSimpleOrdersList(filteredOrders)
+                            : GridView.builder(
+                                padding: AppSpacing.screen,
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                                  childAspectRatio: 0.72,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
+                                ),
+                                itemCount: filteredOrders.length,
+                                itemBuilder: (context, index) => _buildOrderCard(filteredOrders[index]),
+                              ),
                       ),
                     ],
                   ),
@@ -833,5 +838,238 @@ class _KitchenScreenV2State extends ConsumerState<KitchenScreenV2>
     
     // Fallback (ne devrait pas arriver)
     return const SizedBox.shrink();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // MODE SIMPLE - Interface simplifiée pour la cuisine
+  // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildSimpleModeHeader(int orderCount) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      color: AppColors.primarySurface,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.touch_app, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Mode Simple',
+                style: AppTypography.titleMedium.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: orderCount > 0 ? AppColors.warning : AppColors.success,
+              borderRadius: AppSpacing.borderRadiusRound,
+            ),
+            child: Text(
+              '$orderCount commande${orderCount > 1 ? 's' : ''}',
+              style: AppTypography.titleSmall.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimpleOrdersList(List<Map<String, dynamic>> orders) {
+    return ListView.builder(
+      padding: AppSpacing.screen,
+      itemCount: orders.length,
+      itemBuilder: (context, index) {
+        final order = orders[index];
+        final status = order['status'] as String? ?? '';
+        final items = order['order_items'] as List? ?? [];
+        final createdAt = DateTime.tryParse(order['created_at'] ?? '') ?? DateTime.now();
+        final elapsedMinutes = DateTime.now().difference(createdAt).inMinutes;
+        final isPending = status == 'pending';
+        final isConfirmed = status == 'confirmed';
+        final isPreparing = status == 'preparing';
+
+        // Calculer le nombre total d'articles
+        int totalItems = 0;
+        for (var item in items) {
+          totalItems += (item['quantity'] as int? ?? 1);
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: AppSpacing.borderRadiusLg,
+            border: Border.all(
+              color: isPreparing ? AppColors.primary : AppColors.warning,
+              width: 2,
+            ),
+            boxShadow: AppShadows.md,
+          ),
+          child: Column(
+            children: [
+              // Header simplifié
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isPreparing 
+                      ? AppColors.primarySurface 
+                      : AppColors.warningSurface,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppSpacing.radiusLg - 2),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    // Numéro de commande (GROS)
+                    Expanded(
+                      child: Text(
+                        '#${order['order_number'] ?? ''}',
+                        style: AppTypography.headlineSmall.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    // Timer
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.getPriorityColor(elapsedMinutes),
+                        borderRadius: AppSpacing.borderRadiusRound,
+                      ),
+                      child: Text(
+                        '$elapsedMinutes min',
+                        style: AppTypography.titleSmall.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Résumé des plats (simplifié)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$totalItems',
+                        style: AppTypography.headlineMedium.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'article${totalItems > 1 ? 's' : ''} à préparer',
+                            style: AppTypography.titleMedium,
+                          ),
+                          Text(
+                            items.map((i) => '${i['quantity']}x ${i['name']}').take(2).join(', ') +
+                                (items.length > 2 ? '...' : ''),
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.textTertiary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Gros bouton d'action
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 60,
+                  child: isPending
+                      ? Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.warningSurface,
+                            borderRadius: AppSpacing.borderRadiusMd,
+                          ),
+                          child: const Center(
+                            child: Text(
+                              '⏳ Attente livreur...',
+                              style: TextStyle(
+                                color: AppColors.warning,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ),
+                        )
+                      : isConfirmed
+                          ? ElevatedButton(
+                              onPressed: () => _startPreparing(order['id']),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: AppSpacing.borderRadiusMd,
+                                ),
+                              ),
+                              child: const Text(
+                                '👨‍🍳 DÉMARRER',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            )
+                          : ElevatedButton(
+                              onPressed: () => _markAsReady(order['id']),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.success,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: AppSpacing.borderRadiusMd,
+                                ),
+                              ),
+                              child: const Text(
+                                '✅ PRÊT',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

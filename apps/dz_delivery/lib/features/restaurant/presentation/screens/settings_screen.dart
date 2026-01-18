@@ -1,22 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
 import '../../../../core/design_system/theme/app_typography.dart';
 import '../../../../core/design_system/theme/app_spacing.dart';
 import '../../../../core/design_system/theme/app_shadows.dart';
 import '../../../../core/services/preferences_service.dart';
+import '../../../../providers/simple_mode_provider.dart';
 import '../../../../main.dart';
 
 /// Écran des paramètres restaurant
 /// Mode sombre, notifications, sons, langue
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isDarkMode = PreferencesService.isDarkMode;
   bool _notificationsEnabled = PreferencesService.notificationsEnabled;
   bool _soundEnabled = PreferencesService.soundEnabled;
@@ -37,6 +39,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Mode Simple (Cuisine)
+            _buildSectionTitle('👆 Mode Simple'),
+            _buildSettingsCard([
+              _buildSimpleModeToggle(),
+            ]),
+            AppSpacing.vLg,
+
             // Appearance
             _buildSectionTitle('🎨 Apparence'),
             _buildSettingsCard([
@@ -184,6 +193,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
       trailing: Switch(
         value: value,
         onChanged: onChanged,
+        activeColor: AppColors.primary,
+      ),
+    );
+  }
+
+  Widget _buildSimpleModeToggle() {
+    final simpleModeState = ref.watch(simpleModeProvider);
+    final isEnabled = simpleModeState.restaurantSimpleMode;
+
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isEnabled ? AppColors.primary : AppColors.primarySurface,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          Icons.touch_app,
+          color: isEnabled ? Colors.white : AppColors.primary,
+          size: 20,
+        ),
+      ),
+      title: const Text('Mode Simple Cuisine'),
+      subtitle: Text(
+        'Gros boutons, moins de détails',
+        style: AppTypography.bodySmall.copyWith(color: AppColors.textTertiary),
+      ),
+      trailing: Switch(
+        value: isEnabled,
+        onChanged: (_) {
+          HapticFeedback.selectionClick();
+          ref.read(simpleModeProvider.notifier).toggleRestaurantMode();
+        },
         activeColor: AppColors.primary,
       ),
     );
