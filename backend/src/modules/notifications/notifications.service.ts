@@ -50,8 +50,8 @@ export class NotificationsService {
           headings: { en: title, fr: title },
           contents: { en: message, fr: message },
           data: data || {},
-          android_channel_id: 'orders',
-          android_accent_color: 'FF6B35',
+          // android_channel_id: 'orders', // ⚠️ Bloque si le channel n'existe pas
+          small_icon: 'ic_stat_onesignal_default', // Icone par défaut si configurée
           ios_sound: 'default',
           ios_badgeType: 'Increase',
           ios_badgeCount: 1,
