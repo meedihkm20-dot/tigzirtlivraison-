@@ -8,6 +8,7 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export enum OrderStatus {
   PENDING = 'pending',
+  VERIFYING = 'verifying',
   CONFIRMED = 'confirmed',
   PREPARING = 'preparing',
   READY = 'ready',
