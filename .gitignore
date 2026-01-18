@@ -20,9 +20,9 @@ out/
 .env.production.local
 *.env
 
-# Firebase sensitive files
-**/google-services.json
-google-services*.json
+# Firebase sensitive files (allow google-services.json for CI builds)
+# **/google-services.json
+# google-services*.json
 **/GoogleService-Info.plist
 
 # IDE
