@@ -56,15 +56,16 @@ class _LivreurOrdersScreenState extends ConsumerState<LivreurOrdersScreen>
     setState(() => _isLoading = true);
     try {
       final livreurState = ref.read(livreurProvider);
-      final livreurId = livreurState.userProfile?.id;
+      // ✅ FIX: Utiliser livreurId (table livreurs) au lieu de userProfile.id
+      final livreurId = livreurState.livreurId;
       
       if (livreurId != null) {
-        // Charger commandes acceptées par ce livreur (statuts: confirmed, preparing, ready, picked_up, delivering)
+        // Charger commandes acceptées par ce livreur (statuts: verifying, confirmed, preparing, ready, picked_up, delivering)
         final accepted = await SupabaseService.client
             .from('orders')
             .select('*, restaurants(*), profiles(*)')
             .eq('livreur_id', livreurId)
-            .inFilter('status', ['confirmed', 'preparing', 'ready', 'picked_up', 'delivering'])
+            .inFilter('status', ['verifying', 'confirmed', 'preparing', 'ready', 'picked_up', 'delivering'])
             .order('created_at', ascending: false);
         
         // Charger commandes disponibles (statut pending, sans livreur assigné)
@@ -478,6 +479,10 @@ class _LivreurOrdersScreenState extends ConsumerState<LivreurOrdersScreen>
     String label;
     
     switch (status) {
+      case 'verifying':
+        color = AppColors.warning;
+        label = 'Vérification';
+        break;
       case 'confirmed':
         color = AppColors.info;
         label = 'Confirmée';
