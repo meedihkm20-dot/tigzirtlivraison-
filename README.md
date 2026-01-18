@@ -17,7 +17,9 @@ Application de livraison multiservice (Restaurants & Livraison) pour la ville de
 - **Frontend**: Flutter (Riverpod, Supabase Auth)
 - **Backend**: NestJS (Supabase, OneSignal)
 - **Database**: PostgreSQL (Supabase)
-- **CI/CD**: GitHub Actions + Firebase App Distribution
+- **CI/CD**: GitHub Actions + Firebase App Distribution (Automated Beta)
 
 ## 📦 Build Status
 [![Build APKs](https://github.com/meedihkm20-dot/tigzirtlivraison-/actions/workflows/build-apk.yml/badge.svg)](https://github.com/meedihkm20-dot/tigzirtlivraison-/actions/workflows/build-apk.yml)
+
+> **Note**: Les builds réussis sont automatiquement envoyés aux Beta Testeurs via Firebase App Distribution.
