@@ -61,15 +61,45 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
     
     _loadOrder();
     _startLocationTracking();
+    _startOrderSubscription(); // ✅ Démarrer l'écoute temps réel
   }
+
+  StreamSubscription<List<Map<String, dynamic>>>? _orderSubscription;
 
   @override
   void dispose() {
     _pulseController.dispose();
     _positionStream?.cancel();
     _locationUpdateTimer?.cancel();
+    _orderSubscription?.cancel(); // ✅ Cancel subscription
     VoiceNavigationService.stop();
     super.dispose();
+  }
+
+  // ✅ Nouvelle méthode pour écouter les changements en temps réel
+  void _startOrderSubscription() {
+    _orderSubscription = SupabaseService.client
+        .from('orders')
+        .stream(primaryKey: ['id'])
+        .eq('id', widget.orderId)
+        .listen((data) {
+          if (data.isNotEmpty && mounted) {
+            final newStatus = data.first['status'];
+            // Si le statut change vers 'ready', on met à jour l'UI automatiquement
+            if (_order != null && _order!['status'] != newStatus) {
+              setState(() {
+                _order!['status'] = newStatus;
+                // Si on passe à ready, on notifie l'utilisateur
+                if (newStatus == 'ready') { 
+                   VoiceNavigationService.announceDeliveryStatus('ready');
+                   HapticFeedback.mediumImpact();
+                }
+              });
+            }
+          }
+        }, onError: (e) {
+          debugPrint('Erreur Stream: $e');
+        });
   }
 
 
@@ -793,16 +823,24 @@ class _DeliveryScreenV2State extends State<DeliveryScreenV2>
           if (_currentStep == 'pickup')
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _confirmPickup,
-                icon: const Icon(Icons.check_circle),
-                label: const Text('Commande récupérée'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusLg),
-                ),
+              child: Builder(
+                builder: (context) {
+                  final status = _order?['status'];
+                  // ✅ FIX: Bouton actif UNIQUEMENT si la commande est prête
+                  final isReady = status == 'ready';
+                  
+                  return ElevatedButton.icon(
+                    onPressed: isReady ? _confirmPickup : null, // Désactivé si pas prête
+                    icon: Icon(isReady ? Icons.check_circle : Icons.hourglass_empty),
+                    label: Text(isReady ? 'Commande récupérée' : 'En préparation...'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isReady ? AppColors.primary : Colors.grey,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusLg),
+                    ),
+                  );
+                }
               ),
             )
           else

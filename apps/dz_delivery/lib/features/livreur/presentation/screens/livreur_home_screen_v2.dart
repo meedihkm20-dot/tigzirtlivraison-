@@ -101,7 +101,9 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
     // ✅ Utiliser le provider pour les données
     final livreurState = ref.watch(livreurProvider);
     final isOnline = livreurState.isOnline;
-    final currentDelivery = livreurState.currentDelivery;
+    final livreurState = ref.watch(livreurProvider);
+    final isOnline = livreurState.isOnline;
+    final currentDeliveries = livreurState.currentDeliveries; // ✅ Liste complète
     
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -115,8 +117,60 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
                 slivers: [
                   _buildHeader(),
                   SliverToBoxAdapter(child: _buildOnlineToggle(isOnline)),
-                  if (currentDelivery != null)
-                    SliverToBoxAdapter(child: _buildCurrentDelivery(currentDelivery)),
+                  SliverToBoxAdapter(child: _buildOnlineToggle(isOnline)),
+                  
+                  // ✅ Afficher TOUTES les livraisons actives
+                  if (currentDeliveries.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: AppSpacing.screenHorizontal,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'En cours (${currentDeliveries.length})', 
+                                  style: AppTypography.titleMedium
+                                ),
+                                if (currentDeliveries.length > 1)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.livreurPrimary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'Multi-commandes',
+                                      style: AppTypography.labelSmall.copyWith(color: AppColors.livreurPrimary),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 160, // Hauteur fixe pour le carrousel
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              padding: AppSpacing.screenHorizontal,
+                              itemCount: currentDeliveries.length,
+                              itemBuilder: (context, index) {
+                                return SizedBox(
+                                  width: MediaQuery.of(context).size.width * 0.85, // 85% de la largeur
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(right: 12),
+                                    child: _buildCurrentDelivery(currentDeliveries[index]),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
                   SliverToBoxAdapter(child: _buildTodayStats()),
                   if (_opportunities.isNotEmpty)
                     SliverToBoxAdapter(child: _buildPricingOpportunities()),
@@ -309,7 +363,7 @@ class _LivreurHomeScreenV2State extends ConsumerState<LivreurHomeScreenV2>
         arguments: currentDelivery['id'],
       ),
       child: Container(
-        margin: AppSpacing.screenHorizontal,
+        // margin: AppSpacing.screenHorizontal, // Géré par le ListView parent
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: AppColors.livreurGradient,

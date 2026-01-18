@@ -48,9 +48,7 @@ class _RestaurantOrderDetailScreenState extends State<RestaurantOrderDetailScree
       await SupabaseService.confirmOrder(widget.orderId, prepTime);
       await _loadOrder();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Commande confirmée'), backgroundColor: AppColors.success),
-        );
+        _showTopToast('Commande confirmée');
       }
     } catch (e) {
       if (mounted) {
@@ -69,9 +67,7 @@ class _RestaurantOrderDetailScreenState extends State<RestaurantOrderDetailScree
       await SupabaseService.startPreparing(widget.orderId);
       await _loadOrder();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Préparation démarrée'), backgroundColor: AppColors.info),
-        );
+        _showTopToast('Préparation démarrée', color: AppColors.info);
       }
     } catch (e) {
       if (mounted) {
@@ -90,9 +86,7 @@ class _RestaurantOrderDetailScreenState extends State<RestaurantOrderDetailScree
       await SupabaseService.markAsReady(widget.orderId);
       await _loadOrder();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Commande prête pour livraison'), backgroundColor: AppColors.success),
-        );
+        _showTopToast('Commande prête pour livraison');
       }
     } catch (e) {
       if (mounted) {
@@ -504,5 +498,67 @@ class _PrepTimeDialogState extends State<_PrepTimeDialog> {
         ),
       ],
     );
+  }
+  // ✅ Notification personnalisée en haut (Overlay)
+  void _showTopToast(String message, {Color color = AppColors.success}) {
+    if (!mounted) return;
+    
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 60, // Sous la navbar
+        left: 16,
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, -20 * (1 - value)),
+                  child: child,
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.info, color: Colors.white, size: 20),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      message,
+                      style: AppTypography.labelLarge.copyWith(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) overlayEntry.remove();
+    });
   }
 }

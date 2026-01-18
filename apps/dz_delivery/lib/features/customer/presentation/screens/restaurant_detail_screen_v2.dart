@@ -719,19 +719,8 @@ class _RestaurantDetailScreenV2State extends ConsumerState<RestaurantDetailScree
     // Afficher le nombre d'articles dans le panier
     final cartCount = ref.read(cartItemCountProvider);
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${item['name']} ajouté au panier ($cartCount)'),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-        action: SnackBarAction(
-          label: 'Voir',
-          textColor: Colors.white,
-          onPressed: () => Navigator.pushNamed(context, AppRouter.cart),
-        ),
-      ),
-    );
+    // ✅ Utilisation du Top Toast non intrusif
+    _showTopToast('${item['name']} ajouté! ($cartCount)');
   }
 
   Widget _buildInfoTab() {
@@ -1061,5 +1050,72 @@ class _RestaurantDetailScreenV2State extends ConsumerState<RestaurantDetailScree
         ),
       ),
     );
+  }
+
+  // ✅ Notification personnalisée en haut (Overlay)
+  void _showTopToast(String message, {Color color = AppColors.success}) {
+    if (!mounted) return;
+    
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 16, // En haut (sous la status bar)
+        left: 16,
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, -20 * (1 - value)),
+                  child: child,
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      message,
+                      style: AppTypography.labelLarge.copyWith(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+    
+    // Auto remove après 2 secondes (rapide)
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        overlayEntry.remove();
+      }
+    });
   }
 }
