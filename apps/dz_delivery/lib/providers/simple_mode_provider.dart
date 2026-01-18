@@ -3,8 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Provider pour gérer le Mode Simple
 /// Active une interface simplifiée pour les utilisateurs non-tech
-final simpleModeProvider = StateNotifierProvider<SimpleModeNotifier, SimpleModeState>(
-  (ref) => SimpleModeNotifier(),
+final simpleModeProvider = NotifierProvider<SimpleModeNotifier, SimpleModeState>(
+  SimpleModeNotifier.new,
 );
 
 class SimpleModeState {
@@ -31,13 +31,15 @@ class SimpleModeState {
   }
 }
 
-class SimpleModeNotifier extends StateNotifier<SimpleModeState> {
-  SimpleModeNotifier() : super(const SimpleModeState()) {
-    _load();
-  }
-
+class SimpleModeNotifier extends Notifier<SimpleModeState> {
   static const _clientKey = 'simple_mode_client';
   static const _restaurantKey = 'simple_mode_restaurant';
+
+  @override
+  SimpleModeState build() {
+    _load();
+    return const SimpleModeState();
+  }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
