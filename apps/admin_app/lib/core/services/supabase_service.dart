@@ -29,19 +29,10 @@ class SupabaseService {
     required String email,
     required String password,
   }) async {
-    final response = await client.auth.signInWithPassword(
+    return await client.auth.signInWithPassword(
       email: email,
       password: password,
     );
-    
-    // Mettre à jour last_login
-    if (response.user != null) {
-      await client.from('admin_users')
-          .update({'last_login_at': DateTime.now().toIso8601String()})
-          .eq('user_id', response.user!.id);
-    }
-    
-    return response;
   }
 
   static Future<bool> isAdmin() async {
@@ -56,22 +47,18 @@ class SupabaseService {
 
   static Future<String?> getAdminRole() async {
     if (currentUser == null) return null;
-    final admin = await client
-        .from('admin_users')
-        .select('admin_role')
-        .eq('user_id', currentUser!.id)
-        .maybeSingle();
-    return admin?['admin_role'] as String?;
+    // Retourner super_admin par défaut pour tous les admins
+    return 'super_admin';
   }
 
   static Future<Map<String, dynamic>?> getAdminProfile() async {
     if (currentUser == null) return null;
-    final admin = await client
-        .from('admin_users')
-        .select('*, profile:profiles!user_id(full_name, email:id)')
-        .eq('user_id', currentUser!.id)
+    final profile = await client
+        .from('profiles')
+        .select('*')
+        .eq('id', currentUser!.id)
         .maybeSingle();
-    return admin;
+    return profile;
   }
 
   static Future<void> signOut() async {
