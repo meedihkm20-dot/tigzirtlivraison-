@@ -301,8 +301,8 @@ export class OrdersService {
         throw new ForbiddenException('Livreur non vérifié');
       }
 
-      // Pour accepter une commande pending
-      if (currentStatus === 'pending' && newStatus === 'confirmed') {
+      // Pour accepter une commande pending (via verifying OU confirmed)
+      if (currentStatus === 'pending' && (newStatus === 'verifying' || newStatus === 'confirmed')) {
         if (order.livreur_id !== null) {
           throw new BadRequestException('Commande déjà acceptée par un autre livreur');
         }
@@ -317,6 +317,23 @@ export class OrdersService {
 
     // Ajouter les timestamps selon le statut
     switch (newStatus) {
+      case 'verifying':
+        // Assigner le livreur dès la prise en charge
+        const { data: livreurForVerify } = await supabase
+          .from('livreurs')
+          .select('id')
+          .eq('user_id', userId)
+          .single();
+        if (livreurForVerify) {
+          updates.livreur_id = livreurForVerify.id;
+          updates.livreur_accepted_at = now;
+          // Marquer le livreur comme non disponible
+          await supabase
+            .from('livreurs')
+            .update({ is_available: false })
+            .eq('user_id', userId);
+        }
+        break;
       case 'confirmed':
         updates.confirmed_at = now;
         if (userRole === 'livreur') {
