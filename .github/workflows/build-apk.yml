@@ -28,9 +28,15 @@ jobs:
         working-directory: apps/dz_delivery
         run: flutter pub get
       
-      - name: Restore google-services.json
+      - name: Setup google-services.json
         working-directory: apps/dz_delivery/android/app
-        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > google-services.json
+        run: |
+          if [ -f google-services.json ]; then
+            echo "✅ google-services.json already exists"
+          else
+            echo "Creating google-services.json from secret..."
+            echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > google-services.json
+          fi
       
       - name: Build APK
         working-directory: apps/dz_delivery
