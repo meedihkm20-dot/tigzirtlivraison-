@@ -11,6 +11,7 @@ import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/backend_api_service.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../providers/providers.dart';
+import '../../../../providers/simple_mode_provider.dart';
 
 /// Écran Panier V2 - Premium
 /// Panier intelligent avec suggestions, promos, pourboire, multi-adresses
@@ -209,6 +210,7 @@ class _CartScreenV2State extends ConsumerState<CartScreenV2> with TickerProvider
 
   Widget _buildCartContent(List<CartItem> cartItems) {
     final cartState = ref.watch(cartProvider);
+    final isSimpleMode = ref.watch(simpleModeProvider).clientSimpleMode;
     
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -224,26 +226,29 @@ class _CartScreenV2State extends ConsumerState<CartScreenV2> with TickerProvider
           // Add more items
           _buildAddMoreButton(cartState),
           
-          // Suggestions
-          if (_suggestions.isNotEmpty) _buildSuggestions(),
+          // Suggestions (hidden in simple mode)
+          if (_suggestions.isNotEmpty && !isSimpleMode) _buildSuggestions(),
           
-          // Delivery address
+          // Delivery address (always shown)
           _buildDeliverySection(),
           
-          // Schedule order
-          _buildScheduleSection(),
+          // Schedule order (hidden in simple mode)
+          if (!isSimpleMode) _buildScheduleSection(),
           
-          // Promo code
-          _buildPromoSection(),
+          // Promo code (hidden in simple mode, shown via "Plus d'options")
+          if (!isSimpleMode) _buildPromoSection(),
           
-          // Tip section
-          _buildTipSection(),
+          // Tip section (hidden in simple mode)
+          if (!isSimpleMode) _buildTipSection(),
           
-          // Payment method
+          // Payment method (always shown)
           _buildPaymentSection(),
           
-          // Order note
-          _buildNoteSection(),
+          // Order note (hidden in simple mode)
+          if (!isSimpleMode) _buildNoteSection(),
+          
+          // "Plus d'options" button in simple mode
+          if (isSimpleMode) _buildMoreOptionsButton(),
           
           // Order summary
           _buildOrderSummary(),
@@ -1081,6 +1086,51 @@ class _CartScreenV2State extends ConsumerState<CartScreenV2> with TickerProvider
             ),
             onChanged: (v) => _orderNote = v,
           ),
+        ],
+      ),
+    );
+  }
+
+  // État pour les options avancées en mode simple
+  bool _showAdvancedOptions = false;
+
+  Widget _buildMoreOptionsButton() {
+    return Container(
+      margin: AppSpacing.screen,
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: () => setState(() => _showAdvancedOptions = !_showAdvancedOptions),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: AppSpacing.borderRadiusMd,
+                border: Border.all(color: AppColors.outline),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _showAdvancedOptions ? Icons.expand_less : Icons.expand_more,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _showAdvancedOptions ? 'Moins d\'options' : 'Plus d\'options',
+                    style: AppTypography.labelMedium.copyWith(color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_showAdvancedOptions) ...[
+            const SizedBox(height: 12),
+            _buildPromoSection(),
+            _buildTipSection(),
+            _buildScheduleSection(),
+            _buildNoteSection(),
+          ],
         ],
       ),
     );

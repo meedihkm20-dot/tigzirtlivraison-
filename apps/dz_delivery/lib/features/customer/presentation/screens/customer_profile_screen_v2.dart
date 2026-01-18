@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/design_system/theme/app_colors.dart';
@@ -11,17 +12,18 @@ import '../../../../core/services/supabase_service.dart';
 import '../../../../core/services/onesignal_service.dart';
 import '../../../../core/services/preferences_service.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../providers/simple_mode_provider.dart';
 import '../../../../main.dart';
 
 /// Écran Profil Client V2 - Simplifié (sans gamification excessive)
-class CustomerProfileScreenV2 extends StatefulWidget {
+class CustomerProfileScreenV2 extends ConsumerStatefulWidget {
   const CustomerProfileScreenV2({super.key});
 
   @override
-  State<CustomerProfileScreenV2> createState() => _CustomerProfileScreenV2State();
+  ConsumerState<CustomerProfileScreenV2> createState() => _CustomerProfileScreenV2State();
 }
 
-class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2> {
+class _CustomerProfileScreenV2State extends ConsumerState<CustomerProfileScreenV2> {
   bool _isLoading = true;
   
   Map<String, dynamic>? _profile;
@@ -370,6 +372,8 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2> {
   }
 
   Widget _buildSettings() {
+    final simpleModeState = ref.watch(simpleModeProvider);
+    
     return Padding(
       padding: AppSpacing.screen,
       child: Column(
@@ -377,6 +381,54 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2> {
         children: [
           Text('Paramètres', style: AppTypography.titleMedium),
           SizedBox(height: 12),
+          
+          // Mode Simple Toggle
+          Container(
+            margin: EdgeInsets.only(bottom: 8),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: simpleModeState.clientSimpleMode ? AppColors.primarySurface : AppColors.surface,
+              borderRadius: AppSpacing.borderRadiusMd,
+              border: Border.all(
+                color: simpleModeState.clientSimpleMode ? AppColors.primary : AppColors.outline,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: simpleModeState.clientSimpleMode ? AppColors.primary : AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.touch_app,
+                    color: simpleModeState.clientSimpleMode ? Colors.white : AppColors.textSecondary,
+                    size: 20,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Mode Simple', style: AppTypography.titleSmall),
+                      Text(
+                        'Interface simplifiée, moins d\'options',
+                        style: AppTypography.bodySmall.copyWith(color: AppColors.textTertiary),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: simpleModeState.clientSimpleMode,
+                  onChanged: (_) => ref.read(simpleModeProvider.notifier).toggleClientMode(),
+                  activeColor: AppColors.primary,
+                ),
+              ],
+            ),
+          ),
+          
           _buildSettingItem(Icons.location_on, 'Adresses sauvegardées', AppRouter.savedAddresses),
           _buildSettingItem(Icons.favorite, 'Favoris', AppRouter.favorites),
           _buildSettingItem(Icons.notifications, 'Notifications', null),
