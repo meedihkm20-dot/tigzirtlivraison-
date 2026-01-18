@@ -32,20 +32,32 @@ jobs:
         working-directory: apps/dz_delivery
         run: flutter build apk --release
       
-      - name: Upload APK
+      - name: Upload APK to GitHub Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dz-delivery-apk
           path: apps/dz_delivery/build/app/outputs/flutter-apk/app-release.apk
 
-#      - name: Distribute to Firebase
-#        uses: wzieba/Firebase-Distribution-Github-Action@v1.7.0
-#        with:
-#          appId: "1:613654100148:android:e9b06e00cac30805b37fe1"
-#          serviceCredentialsFileContent: ${{ secrets.FIREBASE_CREDENTIAL_FILE_CONTENT }}
-#          groups: app-livraisonbeta-testers
-#          file: apps/dz_delivery/build/app/outputs/flutter-apk/app-release.apk
-#          debug: true
+      # ═══════════════════════════════════════════════
+      # APPETIZE.IO - Test en ligne sans télécharger
+      # ═══════════════════════════════════════════════
+      - name: Upload to Appetize.io
+        if: success()
+        env:
+          APPETIZE_API_TOKEN: ${{ secrets.APPETIZE_API_TOKEN }}
+          APPETIZE_DZ_DELIVERY_KEY: ${{ secrets.APPETIZE_DZ_DELIVERY_KEY }}
+        run: |
+          if [ -n "$APPETIZE_API_TOKEN" ] && [ -n "$APPETIZE_DZ_DELIVERY_KEY" ]; then
+            echo "📱 Uploading DZ Delivery to Appetize.io..."
+            curl --location --request POST "https://api.appetize.io/v1/apps/${APPETIZE_DZ_DELIVERY_KEY}" \
+              --header "Authorization: Bearer ${APPETIZE_API_TOKEN}" \
+              --form "file=@apps/dz_delivery/build/app/outputs/flutter-apk/app-release.apk" \
+              --form "platform=android" \
+              --form "note=Build from commit ${{ github.sha }}"
+            echo "✅ Upload complete!"
+          else
+            echo "⚠️ Appetize.io secrets not configured - skipping upload"
+          fi
 
   # Admin App build
   build-admin-app:
@@ -74,9 +86,29 @@ jobs:
         working-directory: apps/admin_app
         run: flutter build apk --release
       
-      - name: Upload APK
+      - name: Upload APK to GitHub Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: admin-app-apk
           path: apps/admin_app/build/app/outputs/flutter-apk/app-release.apk
 
+      # ═══════════════════════════════════════════════
+      # APPETIZE.IO - Test en ligne sans télécharger
+      # ═══════════════════════════════════════════════
+      - name: Upload to Appetize.io
+        if: success()
+        env:
+          APPETIZE_API_TOKEN: ${{ secrets.APPETIZE_API_TOKEN }}
+          APPETIZE_ADMIN_KEY: ${{ secrets.APPETIZE_ADMIN_KEY }}
+        run: |
+          if [ -n "$APPETIZE_API_TOKEN" ] && [ -n "$APPETIZE_ADMIN_KEY" ]; then
+            echo "📱 Uploading Admin App to Appetize.io..."
+            curl --location --request POST "https://api.appetize.io/v1/apps/${APPETIZE_ADMIN_KEY}" \
+              --header "Authorization: Bearer ${APPETIZE_API_TOKEN}" \
+              --form "file=@apps/admin_app/build/app/outputs/flutter-apk/app-release.apk" \
+              --form "platform=android" \
+              --form "note=Build from commit ${{ github.sha }}"
+            echo "✅ Upload complete!"
+          else
+            echo "⚠️ Appetize.io secrets not configured - skipping upload"
+          fi
