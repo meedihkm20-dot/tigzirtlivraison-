@@ -594,7 +594,7 @@ class SupabaseService {
     final response = await client.from('orders')
         .select('*, restaurant:restaurants(*), customer:profiles!orders_customer_id_fkey(full_name, phone, address), confirmation_code, livreur_commission')
         .eq('livreur_id', livreur['id'])
-        .inFilter('status', ['confirmed', 'preparing', 'ready', 'picked_up', 'delivering'])
+        .inFilter('status', ['verifying', 'confirmed', 'preparing', 'ready', 'picked_up', 'delivering'])
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response);
   }
@@ -1585,7 +1585,7 @@ class SupabaseService {
     final response = await client.from('orders')
         .select('*, restaurant:restaurants(*), customer:profiles!orders_customer_id_fkey(*)')
         .eq('livreur_id', livreur['id'])
-        .inFilter('status', ['confirmed', 'preparing', 'ready', 'picked_up', 'delivering'])
+        .inFilter('status', ['verifying', 'confirmed', 'preparing', 'ready', 'picked_up', 'delivering'])
         .order('created_at', ascending: false);
     
     return List<Map<String, dynamic>>.from(response);

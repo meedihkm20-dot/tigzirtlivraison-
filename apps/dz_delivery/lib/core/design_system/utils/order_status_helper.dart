@@ -17,6 +17,13 @@ class OrderStatusHelper {
           color: AppColors.statusPending,
           icon: Icons.schedule,
         );
+      case 'verifying':
+        return OrderStatusInfo(
+          label: 'Vérification',
+          labelCustomer: 'En validation',
+          color: AppColors.warning,
+          icon: Icons.phone_callback,
+        );
       case 'confirmed':
         return OrderStatusInfo(
           label: 'Confirmée',
@@ -78,7 +85,7 @@ class OrderStatusHelper {
 
   /// Vérifier si le statut est actif (commande en cours)
   static bool isActive(String? status) {
-    return ['pending', 'confirmed', 'preparing', 'ready', 'picked_up', 'delivering']
+    return ['pending', 'verifying', 'confirmed', 'preparing', 'ready', 'picked_up', 'delivering']
         .contains(status?.toLowerCase());
   }
 
@@ -91,12 +98,13 @@ class OrderStatusHelper {
   static int getOrder(String? status) {
     const order = {
       'pending': 0,
-      'confirmed': 1,
-      'preparing': 2,
-      'ready': 3,
-      'picked_up': 4,
-      'delivering': 5,
-      'delivered': 6,
+      'verifying': 1,
+      'confirmed': 2,
+      'preparing': 3,
+      'ready': 4,
+      'picked_up': 5,
+      'delivering': 6,
+      'delivered': 7,
       'cancelled': -1,
     };
     return order[status?.toLowerCase()] ?? -2;
