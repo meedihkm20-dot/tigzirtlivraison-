@@ -37,12 +37,16 @@ class SupabaseService {
 
   static Future<bool> isAdmin() async {
     if (currentUser == null) return false;
-    final profile = await client
-        .from('profiles')
-        .select('role')
-        .eq('id', currentUser!.id)
-        .maybeSingle();
-    return profile?['role'] == 'admin';
+    try {
+      final profile = await client
+          .from('profiles')
+          .select('role')
+          .eq('id', currentUser!.id)
+          .maybeSingle();
+      return profile?['role'] == 'admin';
+    } catch (e) {
+      return false;
+    }
   }
 
   static Future<String?> getAdminRole() async {

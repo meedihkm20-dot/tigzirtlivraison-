@@ -222,4 +222,162 @@ export class NotificationsService {
       return null;
     }
   }
+
+  // ========================================
+  // NOUVELLES MÉTHODES POUR FLUX COMPLET
+  // ========================================
+
+  /**
+   * Nouvelle commande créée → Notifier TOUS les livreurs disponibles
+   * Pour qu'ils puissent accepter la livraison
+   */
+  async notifyAvailableLivreurs(orderId: string): Promise<void> {
+    try {
+      const order = await this.supabaseService.getOrderById(orderId);
+      const supabase = this.supabaseService.getClient();
+
+      // Récupérer tous les livreurs disponibles et vérifiés
+      const { data: livreurs, error } = await supabase
+        .from('livreurs')
+        .select('user_id')
+        .eq('is_available', true)
+        .eq('is_verified', true);
+
+      if (error || !livreurs?.length) {
+        this.logger.warn('No available livreurs to notify');
+        return;
+      }
+
+      // Envoyer notification à chaque livreur disponible
+      const notifications = livreurs.map((l) =>
+        this.sendPushToUser(
+          l.user_id,
+          '📦 Nouvelle livraison disponible !',
+          `Commande #${order.order_number} - ${order.total} DA`,
+          {
+            type: 'new_delivery_available',
+            order_id: orderId,
+            order_number: order.order_number,
+          },
+        ),
+      );
+
+      await Promise.allSettled(notifications);
+      this.logger.log(`📱 Notified ${livreurs.length} livreurs for order ${orderId}`);
+    } catch (error) {
+      this.logger.error(`notifyAvailableLivreurs error: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Commande prête → Notifier le livreur assigné
+   * Pour qu'il vienne la récupérer
+   */
+  async notifyLivreurOrderReady(orderId: string, livreurId: string): Promise<OneSignalResponse | null> {
+    try {
+      const order = await this.supabaseService.getOrderById(orderId);
+      const supabase = this.supabaseService.getClient();
+
+      // Récupérer le user_id du livreur
+      const { data: livreur } = await supabase
+        .from('livreurs')
+        .select('user_id')
+        .eq('id', livreurId)
+        .single();
+
+      if (!livreur?.user_id) {
+        this.logger.warn(`Livreur ${livreurId} not found`);
+        return null;
+      }
+
+      return this.sendPushToUser(
+        livreur.user_id,
+        '🍽️ Commande prête à récupérer !',
+        `Commande #${order.order_number} est prête au restaurant`,
+        {
+          type: 'order_ready_pickup',
+          order_id: orderId,
+          order_number: order.order_number,
+        },
+      );
+    } catch (error) {
+      this.logger.error(`notifyLivreurOrderReady error: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Commande récupérée → Notifier le client
+   * Pour qu'il sache que sa commande est en route
+   */
+  async notifyOrderPickedUp(orderId: string): Promise<OneSignalResponse | null> {
+    try {
+      const order = await this.supabaseService.getOrderById(orderId);
+
+      return this.sendPushToUser(
+        order.user_id,
+        '🚚 Votre commande est en route !',
+        `Commande #${order.order_number} arrive bientôt`,
+        {
+          type: 'order_picked_up',
+          order_id: orderId,
+          order_number: order.order_number,
+        },
+      );
+    } catch (error) {
+      this.logger.error(`notifyOrderPickedUp error: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Commande livrée → Notifier le restaurant
+   * Pour confirmer que la commande a été bien reçue par le client
+   */
+  async notifyRestaurantOrderDelivered(orderId: string): Promise<OneSignalResponse | null> {
+    try {
+      const order = await this.supabaseService.getOrderById(orderId);
+      const restaurant = await this.supabaseService.getRestaurantById(order.restaurant_id);
+
+      return this.sendPushToUser(
+        restaurant.owner_id,
+        '✅ Commande livrée !',
+        `Commande #${order.order_number} a été livrée au client`,
+        {
+          type: 'order_delivered_confirm',
+          order_id: orderId,
+          order_number: order.order_number,
+        },
+      );
+    } catch (error) {
+      this.logger.error(`notifyRestaurantOrderDelivered error: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Livreur accepte commande → Notifier le restaurant
+   * Pour qu'il commence la préparation
+   */
+  async notifyRestaurantLivreurAccepted(orderId: string): Promise<OneSignalResponse | null> {
+    try {
+      const order = await this.supabaseService.getOrderById(orderId);
+      const restaurant = await this.supabaseService.getRestaurantById(order.restaurant_id);
+
+      return this.sendPushToUser(
+        restaurant.owner_id,
+        '🔔 Nouvelle commande !',
+        `Commande #${order.order_number} - Un livreur est assigné, commencez la préparation`,
+        {
+          type: 'new_order',
+          order_id: orderId,
+          order_number: order.order_number,
+        },
+      );
+    } catch (error) {
+      this.logger.error(`notifyRestaurantLivreurAccepted error: ${(error as Error).message}`);
+      return null;
+    }
+  }
 }
+

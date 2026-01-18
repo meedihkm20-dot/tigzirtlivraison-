@@ -178,31 +178,52 @@ class OneSignalService {
       return;
     }
 
-    if (orderId == null) {
-      debugPrint('❌ Order ID missing in notification data');
-      return;
-    }
-
     // Naviguer vers l'écran approprié selon le type
     switch (type) {
+      // === RESTAURANT ===
       case 'new_order':
-        // Restaurant: Naviguer vers la cuisine
+        // Restaurant: Nouvelle commande à préparer
         debugPrint('🍽️ Navigating to restaurant kitchen');
         Navigator.pushNamed(context, '/restaurant/kitchen');
         break;
+      case 'order_delivered_confirm':
+        // Restaurant: Confirmation livraison
+        debugPrint('✅ Navigating to restaurant orders');
+        Navigator.pushNamed(context, '/restaurant/orders');
+        break;
+
+      // === CLIENT ===
       case 'order_confirmed':
       case 'order_ready':
       case 'driver_assigned':
+      case 'order_picked_up':
       case 'order_delivered':
         // Client: Naviguer vers le suivi de commande
         debugPrint('👤 Navigating to order tracking: $orderId');
-        Navigator.pushNamed(context, '/customer/order-tracking', arguments: orderId);
+        if (orderId != null) {
+          Navigator.pushNamed(context, '/customer/order-tracking', arguments: orderId);
+        } else {
+          Navigator.pushNamed(context, '/customer/orders');
+        }
         break;
+
+      // === LIVREUR ===
       case 'new_delivery':
-        // Livreur: Naviguer vers la livraison
-        debugPrint('🚚 Navigating to delivery: $orderId');
-        Navigator.pushNamed(context, '/livreur/delivery', arguments: orderId);
+      case 'new_delivery_available':
+        // Livreur: Nouvelle livraison disponible
+        debugPrint('🚚 Navigating to livreur home for new delivery');
+        Navigator.pushNamed(context, '/livreur/home');
         break;
+      case 'order_ready_pickup':
+        // Livreur: Commande prête à récupérer
+        debugPrint('📦 Navigating to delivery: $orderId');
+        if (orderId != null) {
+          Navigator.pushNamed(context, '/livreur/delivery', arguments: orderId);
+        } else {
+          Navigator.pushNamed(context, '/livreur/home');
+        }
+        break;
+
       default:
         debugPrint('⚠️ Type de notification non géré: $type');
         // Navigation par défaut vers l'accueil

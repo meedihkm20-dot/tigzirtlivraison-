@@ -50,7 +50,7 @@ export class OrdersService {
     private supabaseService: SupabaseService,
     private notificationsService: NotificationsService,
     private deliveryService: DeliveryService,
-  ) {}
+  ) { }
 
   /**
    * Créer une commande (validation côté serveur)
@@ -151,8 +151,8 @@ export class OrdersService {
       this.logger.error(`Order items error: ${itemsError.message}`);
     }
 
-    // 7. Notifier le restaurant (OneSignal)
-    await this.notificationsService.notifyNewOrder(order.id);
+    // 7. Notifier tous les livreurs disponibles (nouvelle commande à livrer)
+    await this.notificationsService.notifyAvailableLivreurs(order.id);
 
     this.logger.log(`Order created: ${order.order_number}`);
     return { order, items: orderItems };
@@ -362,8 +362,8 @@ export class OrdersService {
       throw new BadRequestException(`Erreur mise à jour: ${updateError.message}`);
     }
 
-    // Envoyer notifications
-    await this.sendStatusNotification(orderId, newStatus);
+    // Envoyer notifications (passer l'order pour éviter re-fetch)
+    await this.sendStatusNotification(orderId, newStatus, order);
 
     this.logger.log(`Order ${orderId}: ${currentStatus} → ${newStatus}`);
     return {
@@ -476,26 +476,57 @@ export class OrdersService {
 
   /**
    * Envoyer notification selon le nouveau statut
+   * FLUX COMPLET:
+   * - pending (créé) → Tous les livreurs
+   * - confirmed (livreur accepte) → Client + Restaurant
+   * - preparing (restaurant prépare) → (optionnel)
+   * - ready (restaurant prêt) → Livreur + Client
+   * - picked_up (livreur récupère) → Client
+   * - delivered (livreur livre) → Client + Restaurant
    */
-  private async sendStatusNotification(orderId: string, status: string) {
+  private async sendStatusNotification(orderId: string, status: string, order?: any) {
     try {
+      // Récupérer la commande si pas fournie
+      if (!order) {
+        order = await this.supabaseService.getOrderById(orderId);
+      }
+
       switch (status) {
         case 'confirmed':
-          // ⚠️ SQL: 'confirmed' (pas 'accepted')
+          // Livreur accepte → Client sait qu'un livreur est assigné
           await this.notificationsService.notifyOrderConfirmed(orderId);
+          // Restaurant sait qu'il peut commencer à préparer
+          await this.notificationsService.notifyRestaurantLivreurAccepted(orderId);
           break;
+
         case 'preparing':
-          // Notification optionnelle
+          // Optionnel: le client peut être notifié que la préparation commence
+          // await this.notificationsService.notifyOrderPreparing(orderId);
           break;
+
         case 'ready':
+          // Client sait que sa commande est prête
           await this.notificationsService.notifyOrderReady(orderId);
+          // Livreur sait qu'il doit venir la chercher
+          if (order.livreur_id) {
+            await this.notificationsService.notifyLivreurOrderReady(orderId, order.livreur_id);
+          }
           break;
+
+        case 'picked_up':
+          // Client sait que sa commande est en route
+          await this.notificationsService.notifyOrderPickedUp(orderId);
+          break;
+
         case 'delivered':
+          // Client sait que c'est livré
           await this.notificationsService.notifyOrderDelivered(orderId);
+          // Restaurant sait que c'est livré
+          await this.notificationsService.notifyRestaurantOrderDelivered(orderId);
           break;
       }
     } catch (error) {
-      this.logger.warn(`Notification error for ${orderId}: ${error.message}`);
+      this.logger.warn(`Notification error for ${orderId}: ${(error as Error).message}`);
     }
   }
 }
