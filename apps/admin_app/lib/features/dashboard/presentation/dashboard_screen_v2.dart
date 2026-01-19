@@ -309,36 +309,36 @@ class _DashboardScreenV2State extends State<DashboardScreenV2> {
                     // Gestion
                     const Text('Gestion', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ManagementCard(
-                            icon: Icons.restaurant,
-                            label: 'Restaurants',
-                            count: _stats['total_restaurants'] ?? 0,
-                            color: Colors.orange,
-                            onTap: () => Navigator.pushNamed(context, AppRouter.restaurantsManagement),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _ManagementCard(
+                              icon: Icons.restaurant,
+                              label: 'Restaurants',
+                              count: _stats['total_restaurants'] ?? 0,
+                              color: Colors.orange,
+                              onTap: () => Navigator.pushNamed(context, AppRouter.restaurants),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _ManagementCard(
-                            icon: Icons.delivery_dining,
-                            label: 'Livreurs',
-                            count: _stats['total_livreurs'] ?? 0,
-                            color: Colors.blue,
-                            onTap: () => Navigator.pushNamed(context, AppRouter.livreursManagement),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _ManagementCard(
+                              icon: Icons.delivery_dining,
+                              label: 'Livreurs',
+                              count: _stats['total_livreurs'] ?? 0,
+                              color: Colors.blue,
+                              onTap: () => Navigator.pushNamed(context, AppRouter.livreurs),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
                     const SizedBox(height: 12),
                     _ManagementCard(
                       icon: Icons.settings,
-                      label: 'Paramètres Système',
-                      subtitle: 'Configuration plateforme',
+                      label: 'Paramètres Plateforme',
+                      subtitle: 'Configuration globale',
                       color: Colors.purple,
-                      onTap: () => Navigator.pushNamed(context, AppRouter.systemSettings),
+                      onTap: () => Navigator.pushNamed(context, AppRouter.settings),
                       fullWidth: true,
                     ),
                     const SizedBox(height: 24),
@@ -353,8 +353,8 @@ class _DashboardScreenV2State extends State<DashboardScreenV2> {
                         _QuickAction(icon: Icons.search, label: 'Rechercher', onTap: () => Navigator.pushNamed(context, AppRouter.orders)),
                         _QuickAction(icon: Icons.report_problem, label: 'Incidents', onTap: () => Navigator.pushNamed(context, AppRouter.incidents)),
                         _QuickAction(icon: Icons.account_balance_wallet, label: 'Finance', onTap: () => Navigator.pushNamed(context, AppRouter.finance)),
-                        _QuickAction(icon: Icons.trending_up, label: 'Pricing', onTap: () => Navigator.pushNamed(context, AppRouter.pricing)),
                         _QuickAction(icon: Icons.history, label: 'Audit', onTap: () => Navigator.pushNamed(context, AppRouter.auditLogs)),
+                        _QuickAction(icon: Icons.settings, label: 'Paramètres', onTap: () => Navigator.pushNamed(context, AppRouter.settings)),
                       ],
                     ),
                   ],

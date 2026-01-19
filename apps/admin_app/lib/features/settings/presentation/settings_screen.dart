@@ -151,10 +151,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () => _showEditDialog('admin_commission_percent', 'Commission admin (%)', _settings['admin_commission_percent'] ?? '5', isNumber: true),
                   ),
                   _SettingTile(
-                    icon: Icons.local_shipping,
-                    label: 'Frais livraison minimum',
-                    value: '${_settings['min_delivery_fee'] ?? '100'} DA',
-                    onTap: () => _showEditDialog('min_delivery_fee', 'Frais livraison min (DA)', _settings['min_delivery_fee'] ?? '100', isNumber: true),
+                    icon: Icons.monetization_on,
+                    label: 'Frais de service',
+                    value: '${_settings['service_fee'] ?? '50'} DA',
+                    onTap: () => _showEditDialog('service_fee', 'Frais de service (DA)', _settings['service_fee'] ?? '50', isNumber: true),
                   ),
                   _SettingTile(
                     icon: Icons.shopping_cart,
@@ -167,10 +167,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // Livraison
                   _SectionHeader(title: '🚚 Livraison', color: Colors.orange),
                   _SettingTile(
+                    icon: Icons.local_shipping,
+                    label: 'Frais livraison de base',
+                    value: '${_settings['base_delivery_fee'] ?? '150'} DA',
+                    onTap: () => _showEditDialog('base_delivery_fee', 'Frais livraison base (DA)', _settings['base_delivery_fee'] ?? '150', isNumber: true),
+                  ),
+                  _SettingTile(
+                    icon: Icons.route,
+                    label: 'Frais par kilomètre',
+                    value: '${_settings['per_km_fee'] ?? '30'} DA',
+                    onTap: () => _showEditDialog('per_km_fee', 'Frais par km (DA)', _settings['per_km_fee'] ?? '30', isNumber: true),
+                  ),
+                  _SettingTile(
                     icon: Icons.map,
-                    label: 'Rayon de livraison max',
+                    label: 'Distance max livraison',
                     value: '${_settings['max_delivery_radius_km'] ?? '15'} km',
-                    onTap: () => _showEditDialog('max_delivery_radius_km', 'Rayon max (km)', _settings['max_delivery_radius_km'] ?? '15', isNumber: true),
+                    onTap: () => _showEditDialog('max_delivery_radius_km', 'Distance max (km)', _settings['max_delivery_radius_km'] ?? '15', isNumber: true),
                   ),
                   _SettingTile(
                     icon: Icons.timer,
@@ -187,6 +199,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     label: 'Max commandes/heure/client',
                     value: _settings['max_orders_per_hour'] ?? '5',
                     onTap: () => _showEditDialog('max_orders_per_hour', 'Max commandes/heure', _settings['max_orders_per_hour'] ?? '5', isNumber: true),
+                  ),
+                  _SettingTile(
+                    icon: Icons.assignment,
+                    label: 'Commandes actives max/livreur',
+                    value: _settings['max_active_orders'] ?? '5',
+                    onTap: () => _showEditDialog('max_active_orders', 'Max commandes actives', _settings['max_active_orders'] ?? '5', isNumber: true),
+                  ),
+                  _SettingTile(
+                    icon: Icons.today,
+                    label: 'Commandes max/jour/restaurant',
+                    value: _settings['max_daily_orders'] ?? '100',
+                    onTap: () => _showEditDialog('max_daily_orders', 'Max commandes/jour', _settings['max_daily_orders'] ?? '100', isNumber: true),
                   ),
                 ],
               ),

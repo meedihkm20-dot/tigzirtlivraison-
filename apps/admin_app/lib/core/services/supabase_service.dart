@@ -307,6 +307,37 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
+  static Future<List<Map<String, dynamic>>> getAllLivreursWithStats() async {
+    final livreurs = await getAllLivreurs();
+    List<Map<String, dynamic>> result = [];
+
+    for (var livreur in livreurs) {
+      final orders = await client
+          .from('orders')
+          .select('id, livreur_commission')
+          .eq('livreur_id', livreur['id'])
+          .eq('status', 'delivered');
+
+      double totalEarnings = 0;
+      for (var order in orders) {
+        totalEarnings += (order['livreur_commission'] as num?)?.toDouble() ?? 0;
+      }
+
+      // Calculer aussi les commandes rejetées si possible (nécessiterait une table d'audit ou un champ spécifique, ignorons pour l'instant ou mettons 0)
+      
+      result.add({
+        ...livreur,
+        'stats': {
+          'total_deliveries': orders.length,
+          'total_earnings': totalEarnings,
+          'rejected_orders': 0, // Placeholder
+        },
+      });
+    }
+
+    return result;
+  }
+
   static Future<List<Map<String, dynamic>>> getPendingLivreurs() async {
     final response = await client
         .from('livreurs')
