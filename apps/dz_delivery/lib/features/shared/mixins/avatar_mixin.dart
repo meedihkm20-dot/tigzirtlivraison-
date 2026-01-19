@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../core/design_system/theme/app_colors.dart';
-import '../../../core/services/supabase_service.dart';
+import '../../../../core/design_system/theme/app_colors.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// Mixin pour la gestion de l'avatar/photo de profil
 /// Utilisable par Customer, Livreur et Restaurant

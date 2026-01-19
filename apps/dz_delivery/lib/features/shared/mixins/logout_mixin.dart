@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../core/design_system/theme/app_colors.dart';
-import '../../../core/services/supabase_service.dart';
-import '../../../core/services/onesignal_service.dart';
-import '../../../core/router/app_router.dart';
+import '../../../../core/design_system/theme/app_colors.dart';
+import '../../../../core/services/supabase_service.dart';
+import '../../../../core/services/onesignal_service.dart';
+import '../../../../core/router/app_router.dart';
 
 /// Mixin pour la gestion de la déconnexion
 /// Utilisable par Customer, Livreur et Restaurant

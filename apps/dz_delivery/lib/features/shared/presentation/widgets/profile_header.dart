@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../../core/design_system/theme/app_colors.dart';
-import '../../../core/design_system/theme/app_typography.dart';
-import '../../../core/design_system/theme/app_spacing.dart';
-import '../../../core/design_system/theme/app_shadows.dart';
+import '../../../../core/design_system/theme/app_colors.dart';
+import '../../../../core/design_system/theme/app_typography.dart';
+import '../../../../core/design_system/theme/app_spacing.dart';
+import '../../../../core/design_system/theme/app_shadows.dart';
 
 /// Widget ProfileHeader réutilisable entre Customer, Livreur et Restaurant
 /// Affiche l'avatar, le nom, le sous-titre et un badge optionnel
