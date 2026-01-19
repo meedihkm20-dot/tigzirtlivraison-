@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/supabase_service.dart';
-import '../../shared/widgets/stat_card_simple.dart';
+
 
 /// Écran Gestion Restaurants Admin Amélioré
 /// - Liste complète avec stats

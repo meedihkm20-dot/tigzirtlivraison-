@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/supabase_service.dart';
-import '../../shared/widgets/stat_card_simple.dart';
+
 
 /// Écran Gestion Livreurs Admin Amélioré
 /// - Liste complète avec stats
