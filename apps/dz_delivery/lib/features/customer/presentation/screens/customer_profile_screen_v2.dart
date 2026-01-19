@@ -12,6 +12,11 @@ import '../../../../core/services/onesignal_service.dart';
 import '../../../../core/services/preferences_service.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../main.dart';
+// Shared components
+import '../../../shared/presentation/widgets/profile_header.dart';
+import '../../../shared/presentation/widgets/settings_menu.dart';
+import '../../../shared/mixins/logout_mixin.dart';
+import '../../../shared/mixins/avatar_mixin.dart';
 
 /// Écran Profil Client V2 - Simplifié (sans gamification excessive)
 class CustomerProfileScreenV2 extends StatefulWidget {
@@ -21,7 +26,8 @@ class CustomerProfileScreenV2 extends StatefulWidget {
   State<CustomerProfileScreenV2> createState() => _CustomerProfileScreenV2State();
 }
 
-class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2> {
+class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2>
+    with LogoutMixin, AvatarMixin {
   bool _isLoading = true;
   
   Map<String, dynamic>? _profile;
@@ -227,17 +233,17 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2> {
           SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildStatCard('🛍️', '$totalOrders', 'Commandes')),
+              Expanded(child: StatCardSimple(emoji: '🛍️', value: '$totalOrders', label: 'Commandes')),
               SizedBox(width: 12),
-              Expanded(child: _buildStatCard('💰', '${totalSpent.toStringAsFixed(0)} DA', 'Dépensé')),
+              Expanded(child: StatCardSimple(emoji: '💰', value: '${totalSpent.toStringAsFixed(0)} DA', label: 'Dépensé')),
             ],
           ),
           SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildStatCard('⭐', avgRating > 0 ? avgRating.toStringAsFixed(1) : '-', 'Note moyenne')),
+              Expanded(child: StatCardSimple(emoji: '⭐', value: avgRating > 0 ? avgRating.toStringAsFixed(1) : '-', label: 'Note moyenne')),
               SizedBox(width: 12),
-              Expanded(child: _buildStatCard('🎯', 'Standard', 'Statut')),
+              Expanded(child: StatCardSimple(emoji: '🎯', value: 'Standard', label: 'Statut')),
             ],
           ),
         ],
@@ -245,30 +251,7 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2> {
     );
   }
 
-  Widget _buildStatCard(String emoji, String value, String label) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppSpacing.borderRadiusMd,
-        boxShadow: AppShadows.sm,
-      ),
-      child: Column(
-        children: [
-          Text(emoji, style: TextStyle(fontSize: 24)),
-          SizedBox(height: 8),
-          Text(
-            value,
-            style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.bold),
-          ),
-          Text(
-            label,
-            style: AppTypography.bodySmall.copyWith(color: AppColors.textTertiary),
-          ),
-        ],
-      ),
-    );
-  }
+  // _buildStatCard remplacé par StatCardSimple du shared/
 
   Widget _buildRecentOrders() {
     return Padding(
@@ -401,7 +384,7 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2> {
       trailing: Icon(Icons.chevron_right, color: AppColors.textTertiary),
       onTap: () {
         if (isDestructive) {
-          _logout();
+          showLogoutConfirmation(); // Utilise le LogoutMixin
         } else if (route != null) {
           Navigator.pushNamed(context, route);
         } else {
@@ -584,34 +567,5 @@ class _CustomerProfileScreenV2State extends State<CustomerProfileScreenV2> {
     }
   }
 
-  void _logout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Déconnexion'),
-        content: Text('Êtes-vous sûr de vouloir vous déconnecter?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Annuler')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: Text('Déconnexion'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        await SupabaseService.signOut();
-        if (mounted) {
-          Navigator.pushNamedAndRemoveUntil(context, AppRouter.login, (route) => false);
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e'), backgroundColor: AppColors.error),
-        );
-      }
-    }
-  }
+  // _logout() remplacé par showLogoutConfirmation() du LogoutMixin
 }

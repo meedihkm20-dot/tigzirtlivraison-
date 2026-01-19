@@ -12,6 +12,9 @@ import '../../../../core/services/onesignal_service.dart';
 import '../../../../core/services/preferences_service.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../main.dart';
+// Shared components
+import '../../../shared/presentation/widgets/profile_header.dart';
+import '../../../shared/mixins/logout_mixin.dart';
 
 /// Écran Profil Livreur V2 - Moderne et complet
 class LivreurProfileScreenV2 extends StatefulWidget {
@@ -22,7 +25,7 @@ class LivreurProfileScreenV2 extends StatefulWidget {
 }
 
 class _LivreurProfileScreenV2State extends State<LivreurProfileScreenV2>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, LogoutMixin {
   bool _isLoading = true;
   
   Map<String, dynamic>? _profile;
@@ -278,32 +281,9 @@ class _LivreurProfileScreenV2State extends State<LivreurProfileScreenV2>
     );
   }
 
+  // _buildStatCard remplacé par StatCardSimple du shared/
   Widget _buildStatCard(String emoji, String value, String label) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppSpacing.borderRadiusMd,
-        boxShadow: AppShadows.sm,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 24)),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.bold),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            label,
-            style: AppTypography.bodySmall.copyWith(color: AppColors.textTertiary),
-          ),
-        ],
-      ),
-    );
+    return StatCardSimple(emoji: emoji, value: value, label: label);
   }
 
   Widget _buildVehicleInfo() {
@@ -1112,28 +1092,8 @@ class _LivreurProfileScreenV2State extends State<LivreurProfileScreenV2>
     );
   }
 
-  void _logout() async {
+  void _logout() {
     HapticFeedback.mediumImpact();
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Déconnexion'),
-        content: const Text('Voulez-vous vraiment vous déconnecter?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Déconnexion', style: TextStyle(color: AppColors.error)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      await SupabaseService.signOut();
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(context, AppRouter.login, (route) => false);
-      }
-    }
+    showLogoutConfirmation(primaryColor: AppColors.livreurPrimary);
   }
 }

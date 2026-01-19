@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
+// Shared components
+import '../../shared/mixins/logout_mixin.dart';
 
 class RestaurantProfileScreen extends StatefulWidget {
   const RestaurantProfileScreen({super.key});
@@ -12,7 +14,8 @@ class RestaurantProfileScreen extends StatefulWidget {
   State<RestaurantProfileScreen> createState() => _RestaurantProfileScreenState();
 }
 
-class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
+class _RestaurantProfileScreenState extends State<RestaurantProfileScreen>
+    with LogoutMixin {
   Map<String, dynamic>? _restaurant;
   bool _isLoading = true;
   bool _isUploading = false;
@@ -218,10 +221,7 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
     );
   }
 
-  Future<void> _logout() async {
-    await SupabaseService.signOut();
-    if (mounted) Navigator.pushReplacementNamed(context, AppRouter.login);
-  }
+  // _logout() remplacé par showLogoutConfirmation() du LogoutMixin
 
   @override
   Widget build(BuildContext context) {
@@ -409,7 +409,7 @@ class _RestaurantProfileScreenState extends State<RestaurantProfileScreen> {
                           child: SizedBox(
                             width: double.infinity,
                             child: OutlinedButton.icon(
-                              onPressed: _logout,
+                              onPressed: showLogoutConfirmation,
                               icon: const Icon(Icons.logout, color: Colors.red),
                               label: const Text('Se déconnecter', style: TextStyle(color: Colors.red)),
                               style: OutlinedButton.styleFrom(
